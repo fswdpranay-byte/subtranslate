@@ -103,7 +103,7 @@ export function LiveControlCard() {
             <div className="flex items-center gap-2 rounded-lg bg-ink-950/60 px-2.5 py-1.5 ring-1 ring-inset ring-white/[0.07]">
               <span className={cn('h-1.5 w-1.5 rounded-full', isLive ? 'bg-emerald-400' : 'bg-ink-500')} />
               <span className="font-mono text-xs tabular-nums text-ink-200">{elapsed}</span>
-              <span className="text-[10px] text-ink-500">{isLive ? 'elapsed' : 'idle'}</span>
+              <span className="text-[10px] text-ink-400">{isLive ? 'elapsed' : 'idle'}</span>
             </div>
             <LevelMeter level={inputLevel} active={isLive} />
             <span className="text-[10px] font-medium text-ink-400">
@@ -123,10 +123,10 @@ export function LiveControlCard() {
       <div className="relative mt-4">
         <div className="rounded-xl bg-gradient-to-br from-ink-800 via-ink-900 to-ink-950 p-3 ring-1 ring-inset ring-white/[0.06]">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
               <Languages className="h-3 w-3" /> Live subtitle preview
             </span>
-            <span className="text-[10px] text-ink-600">drag &amp; style in the simulator</span>
+            <span className="text-[10px] text-ink-400">drag &amp; style in the simulator</span>
           </div>
           <SubtitleCard
             original={original || 'Tap the microphone to see your speech appear here in real time.'}

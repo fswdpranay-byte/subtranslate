@@ -75,7 +75,7 @@ The repo includes `.github/workflows/android.yml`, which builds a debug APK on G
 4. Install it on the phone (enable "Install unknown apps" for your browser/file manager).
 5. Grant **microphone**, **notifications**, and **Display over other apps** when the app asks.
 
-> Debug builds are signed with a throwaway key per CI run. If Android says "App not installed" when updating, uninstall the old copy first.
+> CI debug builds are signed with `android/app/debug.p12`, a fixed **debug-only** key committed to the repo, so each new build installs as an update. It cannot be used for Play. If you previously installed a build signed with a different key and Android says "App not installed", uninstall the old copy once.
 
 Debug APKs are signed with the debug key, so they install over USB/download but are **not** accepted by Play. Use §5–6 for a signed release bundle.
 

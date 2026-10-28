@@ -129,7 +129,7 @@ export function SubtitleCustomizer() {
         </div>
       </div>
 
-      <p className="mt-3 flex items-center gap-1.5 text-[10px] text-ink-500">
+      <p className="mt-3 flex items-center gap-1.5 text-[10px] text-ink-400">
         <Languages className="h-3 w-3" /> Tip: drag the subtitle card anywhere in the simulator.
       </p>
     </Card>

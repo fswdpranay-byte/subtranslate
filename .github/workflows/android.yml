@@ -6,6 +6,7 @@ on:
     paths:
       - 'android/**'
       - 'src/**'
+      - 'tailwind.config.js'
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.json'
@@ -14,6 +15,11 @@ on:
 
 permissions:
   contents: write
+
+# Only the newest commit should publish the rolling APK.
+concurrency:
+  group: android-debug-apk
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -71,17 +77,28 @@ jobs:
       # https://github.com/fswdpranay-byte/subtranslate/releases/download/android-latest/subtranslate-debug.apk
       - name: Publish rolling debug release
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-latest
-          name: SubTranslate Android (debug)
-          body: |
-            Automatic **debug** APK built from the latest `main` commit.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/debug/app-debug.apk subtranslate-debug.apk
 
-            - Installable on any Android phone (allow "Install unknown apps").
-            - Debug-signed: uninstall the previous build before installing a new one if Android reports a signature mismatch.
-            - Not accepted by Google Play. Use a signed `.aab` for the store.
-          prerelease: true
-          make_latest: false
-          overwrite_files: true
-          files: android/app/build/outputs/apk/debug/app-debug.apk#subtranslate-debug.apk
+          cat > release-notes.md <<'EOF'
+          Automatic **debug** APK built from the latest `main` commit.
+
+          - Installable on any Android phone (allow "Install unknown apps").
+          - Signed with a fixed debug key, so each build installs over the previous one.
+          - Not accepted by Google Play. Use a signed `.aab` for the store.
+          EOF
+
+          if gh release view android-latest > /dev/null 2>&1; then
+            gh release upload android-latest subtranslate-debug.apk --clobber
+            gh release edit android-latest --notes-file release-notes.md
+          else
+            gh release create android-latest subtranslate-debug.apk \
+              --prerelease --title "SubTranslate Android (debug)" \
+              --notes-file release-notes.md
+          fi
+
+          echo "Published assets:"
+          gh release view android-latest --json assets --jq '.assets[] | "\(.name) \(.size) bytes"'

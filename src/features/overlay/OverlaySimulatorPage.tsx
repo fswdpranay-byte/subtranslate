@@ -254,7 +254,7 @@ export function OverlaySimulatorPage() {
             </div>
           </div>
 
-          <p className="mt-3 flex items-center gap-1.5 text-center text-[10px] text-ink-500">
+          <p className="mt-3 flex items-center gap-1.5 text-center text-[10px] text-ink-400">
             <MonitorSmartphone className="h-3 w-3" />
             Simulated feed · drag the subtitle card to test placement
           </p>
@@ -284,7 +284,7 @@ export function OverlaySimulatorPage() {
               <div className="flex items-center justify-between gap-3 rounded-xl bg-ink-950/50 px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-ink-200">Live status</p>
-                  <p className="text-[10px] capitalize text-ink-500">{status} · {modeLabel}</p>
+                  <p className="text-[10px] capitalize text-ink-400">{status} · {modeLabel}</p>
                 </div>
                 <LevelMeter level={inputLevel} active={isLive} className="w-20" />
               </div>

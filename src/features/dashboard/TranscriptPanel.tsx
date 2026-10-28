@@ -161,7 +161,7 @@ export function TranscriptPanel() {
               <Languages className="h-6 w-6" />
             </span>
             <p className="mt-3 text-sm font-semibold text-ink-200">Your transcript starts here</p>
-            <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-ink-500">
+            <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-ink-400">
               Tap the microphone above, then play a video or speak. Finalized lines are translated
               automatically; partial words appear in italic.
             </p>
@@ -183,13 +183,13 @@ export function TranscriptPanel() {
                   <p className="text-[13px] font-medium leading-relaxed text-ink-100">
                     {segment.original}
                   </p>
-                  <span className="mt-0.5 shrink-0 font-mono text-[9px] text-ink-600">
+                  <span className="mt-0.5 shrink-0 font-mono text-[9px] text-ink-400">
                     {formatTime(segment.at)}
                   </span>
                 </div>
 
                 {segment.translationState === 'pending' ? (
-                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-500">
+                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-400">
                     <Loader2 className="h-3 w-3 animate-spin" /> translating…
                   </p>
                 ) : segment.translationState === 'error' ? (
@@ -217,13 +217,13 @@ export function TranscriptPanel() {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] px-4 py-2.5">
-        <span className="flex items-center gap-1.5 text-[10px] text-ink-500">
+        <span className="flex items-center gap-1.5 text-[10px] text-ink-400">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80" />
           {activeProvider && activeProvider !== 'none'
             ? `Translated with ${providerLabel(activeProvider)}`
             : 'On-device transcript'}
         </span>
-        <span className="text-[10px] text-ink-600">Auto-scroll</span>
+        <span className="text-[10px] text-ink-400">Auto-scroll</span>
       </div>
     </Card>
   );

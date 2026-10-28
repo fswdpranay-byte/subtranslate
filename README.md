@@ -122,7 +122,7 @@ Translation is applied to **final** segments only. Results are cached in `localS
 
 <https://github.com/fswdpranay-byte/subtranslate/releases/download/android-latest/subtranslate-debug.apk>
 
-The GitHub Actions workflow rebuilds this **debug APK** on every push to `main`. On the phone: open the link, allow "Install unknown apps", install, then grant microphone, notifications, and **Display over other apps**.
+The GitHub Actions workflow rebuilds this **debug APK** on every push to `main`. On the phone: open the link, allow "Install unknown apps", install, then grant microphone, notifications, and **Display over other apps**. Successive builds are signed with the same committed debug key, so they install over the previous version without uninstalling.
 
 ### Two capture modes
 

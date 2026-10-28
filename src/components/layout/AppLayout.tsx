@@ -40,7 +40,7 @@ export function AppLayout() {
                     'flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition',
                     isActive
                       ? 'bg-white/[0.07] text-brand-200'
-                      : 'text-ink-500 hover:bg-white/[0.04] hover:text-ink-200',
+                      : 'text-ink-400 hover:bg-white/[0.04] hover:text-ink-200',
                   )
                 }
               >

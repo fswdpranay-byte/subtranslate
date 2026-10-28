@@ -94,7 +94,7 @@ export function LanguagePicker({
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-ink-400" />
         </button>
-        {hint ? <p className="text-[10px] leading-relaxed text-ink-500">{hint}</p> : null}
+        {hint ? <p className="text-[10px] leading-relaxed text-ink-400">{hint}</p> : null}
       </div>
 
       {open ? (
@@ -128,13 +128,13 @@ export function LanguagePicker({
 
             <div className="border-b border-white/[0.07] p-3">
               <div className="flex items-center gap-2 rounded-xl bg-ink-950/70 px-3 ring-1 ring-inset ring-white/10 focus-within:ring-brand-400/50">
-                <Search className="h-4 w-4 text-ink-500" />
+                <Search className="h-4 w-4 text-ink-400" />
                 <input
                   autoFocus
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search languages…"
-                  className="h-10 w-full bg-transparent text-sm text-white placeholder:text-ink-500 focus:outline-none"
+                  className="h-10 w-full bg-transparent text-sm text-white placeholder:text-ink-400 focus:outline-none"
                 />
               </div>
             </div>

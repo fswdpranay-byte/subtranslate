@@ -69,7 +69,7 @@ export function PwaBanners() {
             type="button"
             aria-label="Dismiss update"
             onClick={() => setUpdateAvailable(false)}
-            className="text-ink-500 hover:text-white"
+            className="text-ink-400 hover:text-white"
           >
             <X className="h-3 w-3" />
           </button>
@@ -96,7 +96,7 @@ export function PwaBanners() {
             type="button"
             aria-label="Dismiss install prompt"
             onClick={dismissInstall}
-            className="rounded-md p-1 text-ink-500 hover:text-white"
+            className="rounded-md p-1 text-ink-400 hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
           </button>

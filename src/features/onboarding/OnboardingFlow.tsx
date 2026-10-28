@@ -85,7 +85,7 @@ export function OnboardingFlow() {
               />
               <span
                 className={`text-[9px] font-medium uppercase tracking-wider transition-colors ${
-                  index === step ? 'text-brand-300' : 'text-ink-600'
+                  index === step ? 'text-brand-300' : 'text-ink-400'
                 }`}
               >
                 {label}
@@ -101,7 +101,7 @@ export function OnboardingFlow() {
           {step === 3 ? <TestPlayerStep onContinue={() => void finish()} /> : null}
         </main>
 
-        <p className="mt-6 text-center text-[10px] text-ink-600">
+        <p className="mt-6 text-center text-[10px] text-ink-400">
           No account required · Free on-device engines · Your audio stays yours
         </p>
       </div>
@@ -187,7 +187,7 @@ function WelcomeStep({ onContinue }: StepProps) {
         <Button fullWidth size="lg" onClick={onContinue} rightIcon={<ArrowRight className="h-4 w-4" />}>
           Get started
         </Button>
-        <p className="mt-2 text-center text-[10px] text-ink-500">
+        <p className="mt-2 text-center text-[10px] text-ink-400">
           Takes 30 seconds. You can change everything later.
         </p>
       </div>
@@ -298,14 +298,14 @@ function MicrophoneStep({ onContinue }: StepProps) {
               markMicGranted(false);
               onContinue();
             }}
-            className="w-full py-1 text-center text-[11px] text-ink-500 transition hover:text-ink-300"
+            className="w-full py-1 text-center text-[11px] text-ink-400 transition hover:text-ink-300"
           >
             Maybe later — explore without microphone
           </button>
         ) : null}
       </div>
 
-      <p className="mt-3 text-center text-[9px] leading-relaxed text-ink-600">
+      <p className="mt-3 text-center text-[9px] leading-relaxed text-ink-400">
         Heads-up: Chrome’s built-in SpeechRecognition may use the browser vendor’s cloud. Choose
         Whisper for fully local inference.
       </p>
@@ -552,7 +552,7 @@ function TestPlayerStep({ onContinue }: StepProps) {
           >
             Play demo
           </Button>
-          <span className="ml-auto text-[10px] text-ink-500">
+          <span className="ml-auto text-[10px] text-ink-400">
             {preferences.engine === 'whisper' ? 'Whisper · on-device' : 'Browser speech · free'}
           </span>
         </div>
@@ -562,7 +562,7 @@ function TestPlayerStep({ onContinue }: StepProps) {
         <Button fullWidth size="lg" onClick={onContinue} rightIcon={<ArrowRight className="h-4 w-4" />}>
           Enter SubTranslate
         </Button>
-        <p className="text-center text-[10px] text-ink-500">
+        <p className="text-center text-[10px] text-ink-400">
           You can set your languages and engine on the dashboard.
         </p>
       </div>

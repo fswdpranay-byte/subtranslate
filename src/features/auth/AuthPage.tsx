@@ -106,7 +106,7 @@ export function AuthPage() {
                   Email address
                 </label>
                 <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-ink-950/60 px-3 focus-within:border-brand-400/40">
-                  <Mail className="h-4 w-4 text-ink-500" />
+                  <Mail className="h-4 w-4 text-ink-400" />
                   <input
                     id="auth-email"
                     type="email"
@@ -115,7 +115,7 @@ export function AuthPage() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="you@example.com"
-                    className="h-11 w-full bg-transparent text-sm text-white placeholder:text-ink-600 focus:outline-none"
+                    className="h-11 w-full bg-transparent text-sm text-white placeholder:text-ink-400 focus:outline-none"
                   />
                 </div>
                 <Button
@@ -132,7 +132,7 @@ export function AuthPage() {
 
             <div className="my-4 flex items-center gap-2">
               <span className="h-px flex-1 bg-white/[0.07]" />
-              <span className="text-[9px] uppercase tracking-wider text-ink-600">or</span>
+              <span className="text-[9px] uppercase tracking-wider text-ink-400">or</span>
               <span className="h-px flex-1 bg-white/[0.07]" />
             </div>
 
@@ -145,7 +145,7 @@ export function AuthPage() {
             >
               Continue as guest
             </Button>
-            <p className="mt-2 text-center text-[9px] leading-relaxed text-ink-600">
+            <p className="mt-2 text-center text-[9px] leading-relaxed text-ink-400">
               Guest accounts are anonymous Supabase users. Clearing browser data can lose access —
               that’s fine, transcripts stay local.
             </p>
@@ -189,7 +189,7 @@ export function AuthPage() {
                     onChange={(event) => setName(event.target.value)}
                     maxLength={60}
                     placeholder="Your name"
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-ink-950/60 px-3 text-sm text-white placeholder:text-ink-600 focus:border-brand-400/40 focus:outline-none"
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-ink-950/60 px-3 text-sm text-white placeholder:text-ink-400 focus:border-brand-400/40 focus:outline-none"
                   />
                   <Button
                     size="sm"
@@ -241,7 +241,7 @@ export function AuthPage() {
           </>
         ) : null}
 
-        <p className="text-center text-[10px] text-ink-600">
+        <p className="text-center text-[10px] text-ink-400">
           Auth runs entirely on Supabase’s free tier · RLS enabled ·{' '}
           <Link to="/settings" className="text-ink-400 underline-offset-2 hover:underline">
             Back to settings

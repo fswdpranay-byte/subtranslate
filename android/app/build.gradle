@@ -17,7 +17,21 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // Committed on purpose: this is a *debug* key only. Using a fixed key means
+        // every CI build installs as an update instead of requiring an uninstall.
+        // Replace it with a private release keystore before publishing to Play.
+        debug {
+            storeFile file('debug.p12')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

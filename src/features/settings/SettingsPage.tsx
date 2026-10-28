@@ -247,7 +247,7 @@ export function SettingsPage() {
               {confirmReset ? 'Tap again to confirm reset' : 'Reset all preferences'}
             </Button>
           </div>
-          <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-ink-500">
+          <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-ink-400">
             <Database className="mt-0.5 h-3 w-3 shrink-0" />
             Microphone audio is never written to disk. Browser speech may be processed by the
             browser vendor; Whisper is fully local. Transcript history is only stored in the cloud if
@@ -287,13 +287,13 @@ export function SettingsPage() {
               Open overlay simulator
             </Button>
           </div>
-          <p className="mt-3 text-[10px] leading-relaxed text-ink-500">
+          <p className="mt-3 text-[10px] leading-relaxed text-ink-400">
             Android release bundles are documented in <code className="text-ink-300">ANDROID_GUIDE.md</code>.
             App ID: <code className="text-ink-300">{appConfig.overlay.androidAppId}</code>.
           </p>
         </Card>
 
-        <p className="pb-2 text-center text-[10px] leading-relaxed text-ink-600">
+        <p className="pb-2 text-center text-[10px] leading-relaxed text-ink-400">
           SubTranslate {appConfig.version} · Built with React, Vite, Tailwind and Capacitor.
           <br />
           Free-tier infrastructure only. No analytics, no ad SDKs.

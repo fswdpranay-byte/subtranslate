@@ -71,10 +71,10 @@ export function DashboardPage() {
         </div>
 
         <footer className="flex flex-col items-center gap-1 pb-2 pt-3 text-center sm:flex-row sm:justify-between">
-          <p className="text-[10px] text-ink-600">
+          <p className="text-[10px] text-ink-400">
             SubTranslate v0.1 · Free-tier infrastructure · No audio recordings
           </p>
-          <p className="flex items-center gap-1 text-[10px] text-ink-600">
+          <p className="flex items-center gap-1 text-[10px] text-ink-400">
             <span className="h-1 w-1 rounded-full bg-emerald-400/70" />
             On-device by default · Deepgram trial opt-in
           </p>

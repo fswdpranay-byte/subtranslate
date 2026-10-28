@@ -44,7 +44,7 @@ export function OverlayLauncher() {
         </div>
 
         <div className="mt-3 rounded-xl border border-white/[0.06] bg-ink-950/50 p-3">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
             <MonitorSmartphone className="h-3 w-3" /> Subtitle settings
           </p>
           <p className="mt-1.5 text-xs text-ink-300">
@@ -53,7 +53,7 @@ export function OverlayLauncher() {
             {preferences.subtitle.showOriginal ? 'dual-language' : 'translation only'} ·{' '}
             {preferences.subtitle.position}
           </p>
-          <p className="mt-1 text-[10px] text-ink-500">
+          <p className="mt-1 text-[10px] text-ink-400">
             {preferences.sourceLang === 'auto' ? 'Auto-detect' : preferences.sourceLang.toUpperCase()} →{' '}
             {preferences.targetLang === 'none' ? 'No translation' : preferences.targetLang.toUpperCase()}
           </p>

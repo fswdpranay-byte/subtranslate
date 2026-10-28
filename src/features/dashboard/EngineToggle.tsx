@@ -56,7 +56,7 @@ export function EngineToggle() {
         </div>
       </div>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-ink-500">
+      <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-ink-400">
         <Zap className="mt-0.5 h-3 w-3 shrink-0" />
         On-device is the default. Deepgram only runs when a key or proxy URL is configured, so the
         app never needs paid infrastructure.
