@@ -82,3 +82,54 @@ foreach ($target in $targets) {
   $bmp.Dispose()
   Write-Host "Generated $file"
 }
+
+# ---------------------------------------------------------------------------
+# Android launcher icons (regenerated only when the android/ project exists)
+# ---------------------------------------------------------------------------
+$androidRes = Join-Path $root 'android\app\src\main\res'
+if (Test-Path $androidRes) {
+  $sourcePath = Join-Path $outDir 'icon-512.png'
+  $source = [System.Drawing.Image]::FromFile($sourcePath)
+  $densities = @(
+    @{ Dir = 'mipmap-mdpi'; Size = 48 },
+    @{ Dir = 'mipmap-hdpi'; Size = 72 },
+    @{ Dir = 'mipmap-xhdpi'; Size = 96 },
+    @{ Dir = 'mipmap-xxhdpi'; Size = 144 },
+    @{ Dir = 'mipmap-xxxhdpi'; Size = 192 }
+  )
+
+  foreach ($density in $densities) {
+    $size = [int]$density.Size
+    $dir = Join-Path $androidRes $density.Dir
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+
+    $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.DrawImage($source, 0, 0, $size, $size)
+    $bmp.Save((Join-Path $dir 'ic_launcher.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+    $bmp.Save((Join-Path $dir 'ic_launcher_round.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+    $g.Dispose()
+    $bmp.Dispose()
+
+    # Adaptive-icon foreground uses a 108dp canvas. Keep the artwork inside the
+    # central 72dp safe zone so launcher masks never crop the waveform.
+    $fgSize = [int]($size * 2.25)
+    $artSize = [int]($fgSize * 0.72)
+    $artOffset = [int](($fgSize - $artSize) / 2)
+    $fg = New-Object System.Drawing.Bitmap($fgSize, $fgSize, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $fgGraphics = [System.Drawing.Graphics]::FromImage($fg)
+    $fgGraphics.Clear([System.Drawing.Color]::Transparent)
+    $fgGraphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $fgGraphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $fgGraphics.DrawImage($source, $artOffset, $artOffset, $artSize, $artSize)
+    $fg.Save((Join-Path $dir 'ic_launcher_foreground.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+    $fgGraphics.Dispose()
+    $fg.Dispose()
+
+    Write-Host "Generated Android icons in $dir"
+  }
+
+  $source.Dispose()
+}
