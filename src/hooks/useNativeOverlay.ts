@@ -81,12 +81,24 @@ export function useNativeOverlay() {
         }
 
         // Switching mic <-> system needs a fresh foreground-service type, so
-        // stop any live overlay before starting the new capture session.
+        // stop any live overlay and wait for onDestroy before starting again.
         if (await isNativeOverlayRunning()) {
           await stopNativeOverlay();
+          for (let attempt = 0; attempt < 15; attempt += 1) {
+            if (!(await isNativeOverlayRunning())) break;
+            await new Promise((resolve) => window.setTimeout(resolve, 100));
+          }
         }
 
         await startNativeOverlay(config(captureMode));
+
+        // startForegroundService resolves before the service finishes onCreate,
+        // so give it a moment before reflecting the running state in the UI.
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          if (await isNativeOverlayRunning()) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+        }
+
         setRunning(true);
         toast(
           captureMode === 'system' ? 'Instagram audio capture started' : 'Floating overlay started',
