@@ -2,11 +2,14 @@ package com.subtranslate.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -26,14 +29,18 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.text.Html
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import org.json.JSONArray
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -44,6 +51,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.zip.ZipInputStream
 
@@ -165,6 +173,26 @@ class SubtitleOverlayService : Service(), RecognitionListener {
     private val translatedLines = ArrayDeque<String>()
     private val maxCaptionLines = 3
 
+    /**
+     * Full session transcript. The overlay only shows a rolling window, but the
+     * Copy action must expose everything that was recorded since the last Clear.
+     */
+    private val recordedOriginal = StringBuilder()
+    private val recordedTranslated = StringBuilder()
+
+    /**
+     * Translation cache + provider health. Free endpoints have daily quotas, so
+     * like phrases are served locally and a quota warning switches providers
+     * instead of silently stopping translations.
+     */
+    private val translationCache = object : LinkedHashMap<String, String>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > 300
+    }
+
+    @Volatile
+    private var myMemoryBlockedUntil = 0L
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val translationExecutor = Executors.newSingleThreadExecutor()
     private val restartRunnable = Runnable { if (isRunning && captureMode == MODE_MIC) startListening() }
@@ -231,6 +259,14 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             )
         }
 
+        val copy = TextView(this).apply {
+            text = "Copy"
+            setTextColor(Color.parseColor("#94A3B8"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            setOnClickListener { showTranscriptDialog() }
+        }
+
         val clear = TextView(this).apply {
             text = "Clear"
             setTextColor(Color.parseColor("#94A3B8"))
@@ -247,6 +283,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             setOnClickListener { stopSelf() }
         }
 
+        header.addView(copy)
         header.addView(clear)
         header.addView(close)
 
@@ -422,7 +459,9 @@ class SubtitleOverlayService : Service(), RecognitionListener {
         currentOriginal = originalLines.joinToString(" ")
         // Keep earlier translations visible while the newest phrase is translated.
         currentTranslated = translatedLines.joinToString(" ")
-        return delta.ifEmpty { null }
+        val result = delta.ifEmpty { null }
+        if (result != null) appendRecorded(recordedOriginal, result)
+        return result
     }
 
     /** Append a completed translation so converted captions also continue. */
@@ -430,20 +469,120 @@ class SubtitleOverlayService : Service(), RecognitionListener {
         val line = text.trim()
         if (line.isEmpty()) return
 
+        val delta: String
         if (translatedLines.isEmpty()) {
             translatedLines.addLast(line)
+            delta = line
         } else {
             val previous = translatedLines.last()
             val merged = mergeStreamingText(previous, line)
             when {
                 merged == previous -> return
-                merged == normalizeCaption("$previous $line") -> translatedLines.addLast(line)
-                else -> translatedLines[translatedLines.lastIndex] = merged
+                merged == normalizeCaption("$previous $line") -> {
+                    translatedLines.addLast(line)
+                    delta = line
+                }
+                else -> {
+                    translatedLines[translatedLines.lastIndex] = merged
+                    delta = merged.removePrefix(previous).trim()
+                }
             }
         }
 
         while (translatedLines.size > maxCaptionLines) translatedLines.removeFirst()
         currentTranslated = translatedLines.joinToString(" ")
+        val result = delta.ifEmpty { null }
+        if (result != null) appendRecorded(recordedTranslated, result)
+    }
+
+    private fun appendRecorded(target: StringBuilder, text: String) {
+        val line = text.trim()
+        if (line.isEmpty()) return
+        if (target.isNotEmpty()) target.append(' ')
+        target.append(line)
+    }
+
+    /**
+     * Opens a focusable dialog over the overlay. The floating window is
+     * intentionally non-focusable (so Instagram keeps typing/scrolling behind
+     * it), but the dialog can take focus and expose a selectable transcript.
+     */
+    private fun showTranscriptDialog() {
+        val original = recordedOriginal.toString().trim()
+        val translated = recordedTranslated.toString().trim()
+        if (original.isEmpty() && translated.isEmpty()) {
+            toast("Nothing recorded yet")
+            return
+        }
+
+        val body = buildString {
+            if (original.isNotEmpty()) {
+                append("Original\n")
+                append(original)
+            }
+            if (translated.isNotEmpty()) {
+                if (isNotEmpty()) append("\n\n")
+                append("Translated\n")
+                append(translated)
+            }
+        }
+
+        mainHandler.post {
+            if (!isRunning) return@post
+
+            val textView = TextView(this).apply {
+                text = body
+                setTextIsSelectable(true)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setPadding(dp(18), dp(10), dp(18), dp(10))
+            }
+            val scroll = ScrollView(this).apply {
+                addView(textView)
+                setPadding(0, dp(6), 0, dp(6))
+            }
+
+            val dialog = AlertDialog.Builder(this)
+                .setTitle("Recorded text")
+                .setView(scroll)
+                .setPositiveButton("Copy all") { _, _ -> copyTranscript(body) }
+                .setNegativeButton("Close", null)
+                .create()
+
+            val dialogType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            dialog.window?.setType(dialogType)
+            dialog.show()
+        }
+    }
+
+    private fun copyTranscript(text: String) {
+        try {
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("SubTranslate transcript", text))
+            toast("Recorded text copied")
+        } catch (_: Exception) {
+            toast("Could not copy the transcript")
+        }
+    }
+
+    private fun toast(message: String) {
+        mainHandler.post {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun clearTranscript() {
+        originalLines.clear()
+        translatedLines.clear()
+        recordedOriginal.setLength(0)
+        recordedTranslated.setLength(0)
+        currentOriginal = ""
+        currentTranslated = ""
+        render()
     }
 
     /** Show the live partial phrase after the finalized lines. */
@@ -453,14 +592,6 @@ class SubtitleOverlayService : Service(), RecognitionListener {
         currentOriginal =
             if (line.isEmpty()) finished
             else mergeStreamingText(finished, line)
-    }
-
-    private fun clearTranscript() {
-        originalLines.clear()
-        translatedLines.clear()
-        currentOriginal = ""
-        currentTranslated = ""
-        render()
     }
 
     private fun normalizeCaption(value: String): String =
@@ -1034,46 +1165,162 @@ class SubtitleOverlayService : Service(), RecognitionListener {
     }
 
     // ------------------------------------------------------------------
-    // Free translation (MyMemory) — swap for a Supabase Edge Function later
+    // Free translation: MyMemory -> Google fallback, with a local cache.
+    // The overlay keeps translating for the whole session; a provider quota
+    // hit switches to the next provider instead of stopping captions.
     // ------------------------------------------------------------------
 
     private fun translateLine(text: String) {
         if (!translate || targetLang == "none") return
-        val source = if (sourceLang == "auto") "en" else isoCode(sourceLang)
         val target = isoCode(targetLang)
-        if (source == target) return
+        val source = if (sourceLang == "auto") "auto" else isoCode(sourceLang)
+        if (source != "auto" && source == target) return
+
+        val cacheKey = "$source|$target|$text"
+        synchronized(translationCache) { translationCache[cacheKey] }?.let { cached ->
+            rememberTranslated(cached)
+            render()
+            return
+        }
 
         translationExecutor.execute {
-            try {
-                val query = URLEncoder.encode(text, "UTF-8")
-                val url = URL(
-                    "https://api.mymemory.translated.net/get?q=$query&langpair=$source|$target"
-                )
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 6000
-                connection.readTimeout = 6000
-                connection.requestMethod = "GET"
-                try {
-                    val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    val translated = JSONObject(body)
-                        .optJSONObject("responseData")
-                        ?.optString("translatedText")
-                        ?.trim()
-                        .orEmpty()
-
-                    if (translated.isNotEmpty() && !translated.startsWith("MYMEMORY WARNING")) {
-                        mainHandler.post {
-                            rememberTranslated(translated)
-                            render()
-                        }
-                    }
-                } finally {
-                    connection.disconnect()
-                }
-            } catch (_: Exception) {
-                // Keep the original caption visible; translation is best-effort.
+            val translated = translateText(text, source, target) ?: return@execute
+            synchronized(translationCache) { translationCache[cacheKey] = translated }
+            mainHandler.post {
+                if (!isRunning) return@post
+                rememberTranslated(translated)
+                render()
             }
         }
+    }
+
+    private fun translateText(text: String, source: String, target: String): String? {
+        val chunks = chunkText(text.trim(), 450)
+        if (chunks.isEmpty()) return null
+
+        val parts = ArrayList<String>(chunks.size)
+        for (chunk in chunks) {
+            val part = translateChunk(chunk, source, target) ?: return null
+            parts.add(part)
+        }
+        return parts.joinToString(" ").trim().ifEmpty { null }
+    }
+
+    /** MyMemory rejects queries above ~500 bytes, so split long phrases on words. */
+    private fun chunkText(text: String, maxChars: Int): List<String> {
+        if (text.length <= maxChars) return listOf(text)
+
+        val chunks = mutableListOf<String>()
+        val current = StringBuilder()
+        for (word in text.split(Regex("\\s+"))) {
+            if (current.isNotEmpty() && current.length + 1 + word.length > maxChars) {
+                chunks.add(current.toString())
+                current.setLength(0)
+            }
+            if (current.isNotEmpty()) current.append(' ')
+            current.append(word)
+        }
+        if (current.isNotEmpty()) chunks.add(current.toString())
+        return chunks
+    }
+
+    private fun translateChunk(text: String, source: String, target: String): String? {
+        if (System.currentTimeMillis() >= myMemoryBlockedUntil) {
+            translateWithMyMemory(text, source, target)?.let { return it }
+        }
+        return translateWithGoogle(text, source, target)
+    }
+
+    private fun translateWithMyMemory(text: String, source: String, target: String): String? {
+        val sourceCode = if (source == "auto") guessSourceLanguage() else isoCode(source)
+        val targetCode = isoCode(target)
+        if (sourceCode == targetCode) return text
+
+        return try {
+            val query = URLEncoder.encode(text, "UTF-8")
+            val pair = URLEncoder.encode("$sourceCode|$targetCode", "UTF-8")
+            val url = URL("https://api.mymemory.translated.net/get?q=$query&langpair=$pair")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.requestMethod = "GET"
+            try {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val translated = JSONObject(body)
+                    .optJSONObject("responseData")
+                    ?.optString("translatedText")
+                    ?.trim()
+                    .orEmpty()
+
+                when {
+                    translated.isEmpty() -> null
+                    translated.contains("MYMEMORY WARNING", ignoreCase = true) -> {
+                        // Free quota exhausted for now; use the other provider and
+                        // retry MyMemory later instead of hammering it.
+                        myMemoryBlockedUntil = System.currentTimeMillis() + 15 * 60 * 1000
+                        null
+                    }
+                    translated.contains("QUERY LENGTH LIMIT", ignoreCase = true) -> null
+                    translated.contains("PLEASE SELECT TWO DISTINCT", ignoreCase = true) -> null
+                    translated.contains("INVALID LANGUAGE", ignoreCase = true) -> null
+                    else -> decodeEntities(translated)
+                }
+            } finally {
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Free Google web endpoint used as a second provider. It accepts `auto` as
+     * the source language and has no API key, which keeps long sessions alive
+     * after MyMemory's anonymous quota is used up.
+     */
+    private fun translateWithGoogle(text: String, source: String, target: String): String? {
+        return try {
+            val query = URLEncoder.encode(text, "UTF-8")
+            val sl = if (source == "auto") "auto" else isoCode(source)
+            val url = URL(
+                "https://translate.googleapis.com/translate_a/single" +
+                    "?client=gtx&sl=$sl&tl=${isoCode(target)}&dt=t&q=$query"
+            )
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.requestMethod = "GET"
+            try {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val segments = JSONArray(body).optJSONArray(0) ?: return null
+                val builder = StringBuilder()
+                for (index in 0 until segments.length()) {
+                    val item = segments.optJSONArray(index) ?: continue
+                    val piece = item.optString(0)
+                    if (piece.isNotEmpty()) builder.append(piece)
+                }
+                builder.toString().trim().ifEmpty { null }
+            } finally {
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun decodeEntities(text: String): String {
+        return try {
+            @Suppress("DEPRECATION")
+            Html.fromHtml(text).toString()
+        } catch (_: Exception) {
+            text
+        }
+    }
+
+    private fun guessSourceLanguage(): String {
+        if (captureMode == MODE_SYSTEM) return voskLanguage()
+        val language = Locale.getDefault().language.lowercase()
+        return if (language.isBlank()) "en" else isoCode(language)
     }
 
     private fun isoCode(code: String): String {

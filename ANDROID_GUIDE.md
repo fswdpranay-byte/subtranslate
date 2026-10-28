@@ -161,7 +161,7 @@ Notes:
 | Microphone | Sound in the room (phone speaker) | Android 6+, mic permission |
 | System audio | The audio Instagram/TikTok/YouTube is playing, even with headphones | Android 10+, screen-capture consent, one-time model download per source language |
 
-Both modes transcribe on-device. Only translated text is sent to the free translation endpoint, and only when translation is on.
+Both modes transcribe on-device. Only text is sent to the free translation endpoints (MyMemory, then a keyless Google fallback) and only when translation is on. A local cache serves repeated phrases, so captions keep translating through long sessions instead of stopping when one provider’s free quota runs out.
 
 ### Using system audio with Instagram
 
@@ -178,8 +178,9 @@ Both modes transcribe on-device. Only translated text is sent to the free transl
 5. Wait for the first-run model download (~40–80 MB, shown in the floating card).
    It is cached, so later sessions start immediately.
 6. Press Home and open Instagram. The floating caption card stays above the reel.
-7. Play a reel. Captions follow the audio; you can drag the card, tap **Clear** to
-   reset the transcript, or **✕** to stop.
+7. Play a reel. Captions follow the audio; you can drag the card, tap **Copy** to
+   review/select the full session transcript or copy it all, tap **Clear** to reset
+   the transcript, or **✕** to stop.
 8. Keep the SubTranslate foreground notification visible. On Xiaomi/Redmi, Samsung,
    Oppo, and Vivo also set battery usage to **Unrestricted** so Android does not kill
    the service while Instagram is open.
