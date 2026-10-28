@@ -77,7 +77,9 @@ The repo includes `.github/workflows/android.yml`, which builds a debug APK on G
 
 > CI debug builds are signed with `android/app/debug.p12`, a fixed **debug-only** key committed to the repo, so each new build installs as an update. It cannot be used for Play. If you previously installed a build signed with a different key and Android says "App not installed", uninstall the old copy once.
 
-Debug APKs are signed with the debug key, so they install over USB/download but are **not** accepted by Play. Use §5–6 for a signed release bundle.
+Because that debug key is public, the `android-latest` APK is for testing only: treat it as an unsigned development build, install it only from this repository's releases, and never distribute it as a production app. Play uploads must use your own private release keystore (§5).
+
+Debug APKs install over USB/download but are **not** accepted by Play. Use §5–6 for a signed release bundle.
 
 ---
 

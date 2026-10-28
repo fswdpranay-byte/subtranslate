@@ -133,6 +133,8 @@ The GitHub Actions workflow rebuilds this **debug APK** on every push to `main`.
 
 System audio uses `MediaProjection` + `AudioPlaybackCapture` and transcribes fully on-device with [Vosk](https://alphacephei.com/vosk/). Open **Overlay → Capture Instagram audio**, accept the prompt, then play a video. No audio is uploaded.
 
+> The rolling APK is debug-signed with a public test key. Treat it as a development build — install it only from this repo's releases, and use a private release keystore for Play.
+
 See **[ANDROID_GUIDE.md](./ANDROID_GUIDE.md)** for the complete path from source to a signed `.aab` in the Play Console, including:
 
 - Capacitor platform sync and native overlay sources
