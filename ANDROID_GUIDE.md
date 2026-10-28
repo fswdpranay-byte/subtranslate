@@ -163,6 +163,31 @@ Notes:
 
 Both modes transcribe on-device. Only translated text is sent to the free translation endpoint, and only when translation is on.
 
+### Using system audio with Instagram
+
+1. Install the Android build, open the app, and go to **Overlay**.
+2. Set **Audio language** to the language of the reel. Vosk needs a specific language
+   ("Auto-detect" falls back to English), so pick the real spoken language.
+3. Set **Subtitle language** and enable translation if you want converted text.
+4. Tap **Capture Instagram audio**, then:
+   - Enable **Display over other apps** if Android opens that setting.
+   - Allow **microphone** and **notifications** when asked. `RECORD_AUDIO` is required
+     by Android's playback-capture API, and the notification keeps the service alive.
+   - Accept Android's screen-capture prompt. On Android 14+ choose **Entire screen**
+     (or select Instagram as the single app).
+5. Wait for the first-run model download (~40–80 MB, shown in the floating card).
+   It is cached, so later sessions start immediately.
+6. Press Home and open Instagram. The floating caption card stays above the reel.
+7. Play a reel. Captions follow the audio; you can drag the card, tap **Clear** to
+   reset the transcript, or **✕** to stop.
+8. Keep the SubTranslate foreground notification visible. On Xiaomi/Redmi, Samsung,
+   Oppo, and Vivo also set battery usage to **Unrestricted** so Android does not kill
+   the service while Instagram is open.
+
+If the card says **"No app audio yet"** after several seconds, the app you are testing
+has opted out of playback capture or the media is DRM-protected. Try a different reel,
+raise the media volume, or use the microphone overlay with the phone speaker.
+
 Then sync:
 
 ```powershell

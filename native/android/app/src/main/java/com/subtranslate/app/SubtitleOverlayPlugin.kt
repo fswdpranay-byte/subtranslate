@@ -95,12 +95,8 @@ class SubtitleOverlayPlugin : Plugin() {
             return
         }
 
-        val mode = call.getString("captureMode") ?: SubtitleOverlayService.MODE_MIC
-        if (mode == SubtitleOverlayService.MODE_SYSTEM) {
-            startSystemAudio(call)
-            return
-        }
-
+        // AudioPlaybackCapture (system mode) also needs RECORD_AUDIO, and the
+        // foreground notification needs POST_NOTIFICATIONS on Android 13+.
         val missing = mutableListOf<String>()
         if (getPermissionState("microphone") != PermissionState.GRANTED) {
             missing.add("microphone")
@@ -116,15 +112,24 @@ class SubtitleOverlayPlugin : Plugin() {
             requestPermissionForAliases(missing.toTypedArray(), call, "permissionsCallback")
             return
         }
-        launchService(call, SubtitleOverlayService.ACTION_START)
+        beginStart(call)
+    }
+
+    private fun beginStart(call: PluginCall) {
+        val mode = call.getString("captureMode") ?: SubtitleOverlayService.MODE_MIC
+        if (mode == SubtitleOverlayService.MODE_SYSTEM) {
+            startSystemAudio(call)
+        } else {
+            launchService(call, SubtitleOverlayService.ACTION_START)
+        }
     }
 
     @PermissionCallback
     private fun permissionsCallback(call: PluginCall) {
         if (getPermissionState("microphone") == PermissionState.GRANTED) {
-            launchService(call, SubtitleOverlayService.ACTION_START)
+            beginStart(call)
         } else {
-            call.reject("Microphone permission is required for the floating captions.")
+            call.reject("Microphone permission is required to capture app audio.")
         }
     }
 
