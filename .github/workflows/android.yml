@@ -34,11 +34,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+      - name: Install Android SDK packages
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          SDKMANAGER="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}" -path '*/cmdline-tools/*/bin/sdkmanager' | head -n 1)"
+          echo "sdkmanager=$SDKMANAGER"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Install npm dependencies
         run: npm ci
