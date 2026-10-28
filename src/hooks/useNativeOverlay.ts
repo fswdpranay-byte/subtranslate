@@ -6,26 +6,31 @@ import {
   checkOverlayPermission,
   isAndroidNative,
   isNativeOverlayRunning,
+  isSystemAudioSupported,
   requestOverlayPermission,
   startNativeOverlay,
   stopNativeOverlay,
   updateNativeOverlay,
+  type CaptureMode,
 } from '@/lib/nativeOverlay';
 
 export function useNativeOverlay() {
   const [permission, setPermission] = useState<boolean | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [systemAudioSupported, setSystemAudioSupported] = useState(false);
   const preferences = usePreferencesStore((state) => state.preferences);
 
   const refresh = useCallback(async () => {
     if (!isAndroidNative) {
       setPermission(false);
       setRunning(false);
+      setSystemAudioSupported(false);
       return;
     }
     setPermission(await checkOverlayPermission());
     setRunning(await isNativeOverlayRunning());
+    setSystemAudioSupported(await isSystemAudioSupported());
   }, []);
 
   useEffect(() => {
@@ -40,57 +45,73 @@ export function useNativeOverlay() {
   }, [refresh]);
 
   const config = useCallback(
-    () =>
+    (captureMode: CaptureMode = 'microphone') =>
       buildOverlayConfig(
-        {
-          ...preferences.subtitle,
-          // The native service positions itself; keep the shared style fields only.
-        },
+        preferences.subtitle,
         preferences.sourceLang,
         preferences.targetLang,
         preferences.autoTranslate && preferences.targetLang !== 'none',
+        captureMode,
       ),
     [preferences],
   );
 
-  const start = useCallback(async (): Promise<boolean> => {
-    if (!isAndroidNative) {
-      toast(
-        'Android only',
-        'A PWA cannot draw over other apps. Open the overlay simulator to test the design, or install the Android build.',
-        'info',
-      );
-      return false;
-    }
-    setBusy(true);
-    try {
-      const granted = await checkOverlayPermission();
-      setPermission(granted);
-      if (!granted) {
-        await requestOverlayPermission();
+  const start = useCallback(
+    async (captureMode: CaptureMode = 'microphone'): Promise<boolean> => {
+      if (!isAndroidNative) {
         toast(
-          'Enable "Display over other apps"',
-          'Turn on SubTranslate in Android settings, then return and tap start again.',
+          'Android only',
+          'A PWA cannot draw over other apps. Open the overlay simulator to test the design, or install the Android build.',
           'info',
         );
         return false;
       }
-      await startNativeOverlay(config());
-      setRunning(true);
-      toast('Floating overlay started', 'Drag the card to reposition it. Tap ✕ to stop.', 'success');
-      return true;
-    } catch (error) {
-      toast(
-        'Could not start overlay',
-        error instanceof Error ? error.message : 'The native overlay service rejected the request.',
-        'error',
-      );
-      return false;
-    } finally {
-      setBusy(false);
-      void refresh();
-    }
-  }, [config, refresh]);
+      setBusy(true);
+      try {
+        const granted = await checkOverlayPermission();
+        setPermission(granted);
+        if (!granted) {
+          await requestOverlayPermission();
+          toast(
+            'Enable "Display over other apps"',
+            'Turn on SubTranslate in Android settings, then return and tap start again.',
+            'info',
+          );
+          return false;
+        }
+
+        // Switching mic <-> system needs a fresh foreground-service type, so
+        // stop any live overlay before starting the new capture session.
+        if (await isNativeOverlayRunning()) {
+          await stopNativeOverlay();
+        }
+
+        await startNativeOverlay(config(captureMode));
+        setRunning(true);
+        toast(
+          captureMode === 'system' ? 'Instagram audio capture started' : 'Floating overlay started',
+          captureMode === 'system'
+            ? 'Accept the screen-capture prompt. The first run downloads a small offline speech model.'
+            : 'Drag the card to reposition it. Tap ✕ to stop.',
+          'success',
+        );
+        return true;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error && 'message' in error
+              ? String((error as { message: unknown }).message)
+              : 'The native overlay service rejected the request.';
+        toast('Could not start overlay', message, 'error');
+        return false;
+      } finally {
+        setBusy(false);
+        void refresh();
+      }
+    },
+    [config, refresh],
+  );
 
   const stop = useCallback(async (): Promise<void> => {
     setBusy(true);
@@ -116,6 +137,7 @@ export function useNativeOverlay() {
 
   return {
     isSupported: isAndroidNative,
+    systemAudioSupported,
     permission,
     running,
     busy,

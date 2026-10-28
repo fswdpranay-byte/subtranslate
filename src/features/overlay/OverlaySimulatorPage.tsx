@@ -389,19 +389,56 @@ export function OverlaySimulatorPage() {
                     Overlay permission is off. Launching opens the Android setting.
                   </p>
                 ) : null}
-                <Button
-                  fullWidth
-                  size="sm"
-                  variant={nativeOverlay.running ? 'danger' : 'secondary'}
-                  loading={nativeOverlay.busy}
-                  onClick={() =>
-                    nativeOverlay.running
-                      ? void nativeOverlay.stop()
-                      : void nativeOverlay.start()
-                  }
-                >
-                  {nativeOverlay.running ? 'Stop floating overlay' : 'Launch floating overlay'}
-                </Button>
+
+                {nativeOverlay.running ? (
+                  <Button
+                    fullWidth
+                    size="sm"
+                    variant="danger"
+                    loading={nativeOverlay.busy}
+                    onClick={() => void nativeOverlay.stop()}
+                  >
+                    Stop floating overlay
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      fullWidth
+                      size="sm"
+                      variant="secondary"
+                      loading={nativeOverlay.busy}
+                      onClick={() => void nativeOverlay.start('microphone')}
+                    >
+                      Launch microphone overlay
+                    </Button>
+
+                    {nativeOverlay.systemAudioSupported ? (
+                      <div className="space-y-1.5">
+                        <Button
+                          fullWidth
+                          size="sm"
+                          variant="primary"
+                          loading={nativeOverlay.busy}
+                          leftIcon={<Volume2 className="h-3.5 w-3.5" />}
+                          onClick={() => void nativeOverlay.start('system')}
+                        >
+                          Capture Instagram audio
+                        </Button>
+                        <p className="rounded-lg border border-accent-400/15 bg-accent-400/5 px-2.5 py-2 text-[10px] leading-relaxed text-ink-300">
+                          Accept Android&apos;s screen-capture prompt, then open Instagram and play a
+                          video. The audio is transcribed on-device — the first run downloads a small
+                          speech model (~40–80 MB) for your source language. Use headphones if you
+                          like; the video&apos;s sound does not need to reach the mic.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-white/[0.06] bg-ink-950/40 px-2.5 py-2 text-[10px] text-ink-400">
+                        System-audio capture requires Android 10 or newer. Use the microphone
+                        overlay on older devices.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.06] bg-ink-950/40 px-2.5 py-2">

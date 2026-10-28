@@ -6,6 +6,8 @@ import type { SubtitleStyle } from '@/types';
  * On the web these methods are never invoked; the PWA simulator is used instead.
  */
 
+export type CaptureMode = 'microphone' | 'system';
+
 export interface NativeOverlayConfig {
   fontSize: number;
   /** 0 - 100 */
@@ -16,6 +18,12 @@ export interface NativeOverlayConfig {
   sourceLang: string;
   targetLang: string;
   translate: boolean;
+  /**
+   * `microphone` uses Android's SpeechRecognizer.
+   * `system` uses MediaProjection + AudioPlaybackCapture and an on-device Vosk
+   * model, which hears the audio Instagram is playing (Android 10+).
+   */
+  captureMode: CaptureMode;
 }
 
 interface PermissionResult {
@@ -26,10 +34,15 @@ interface RunningResult {
   running: boolean;
 }
 
+interface SystemAudioResult {
+  supported: boolean;
+}
+
 interface SubtitleOverlayPlugin {
   checkPermission: () => Promise<PermissionResult>;
   requestPermission: () => Promise<PermissionResult>;
   openSettings: () => Promise<void>;
+  isSystemAudioSupported: () => Promise<SystemAudioResult>;
   start: (options: NativeOverlayConfig) => Promise<void>;
   stop: () => Promise<void>;
   update: (options: NativeOverlayConfig) => Promise<void>;
@@ -46,6 +59,7 @@ export function buildOverlayConfig(
   sourceLang: string,
   targetLang: string,
   translate: boolean,
+  captureMode: CaptureMode = 'microphone',
 ): NativeOverlayConfig {
   return {
     fontSize: style.fontSize,
@@ -56,6 +70,7 @@ export function buildOverlayConfig(
     sourceLang,
     targetLang,
     translate,
+    captureMode,
   };
 }
 
@@ -84,6 +99,16 @@ export async function openOverlaySettings(): Promise<boolean> {
   try {
     await SubtitleOverlay.openSettings();
     return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function isSystemAudioSupported(): Promise<boolean> {
+  if (!isAndroidNative) return false;
+  try {
+    const result = await SubtitleOverlay.isSystemAudioSupported();
+    return result.supported;
   } catch {
     return false;
   }

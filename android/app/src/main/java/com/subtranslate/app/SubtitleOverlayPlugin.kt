@@ -1,15 +1,19 @@
 package com.subtranslate.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSObject
 import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
@@ -19,7 +23,8 @@ import com.getcapacitor.annotation.PermissionCallback
  *
  * `Display over other apps` is a special app-op, not a runtime permission, so it
  * has to be granted on a system settings screen. Microphone is a normal runtime
- * permission and is requested here.
+ * permission and is requested here. System-audio capture uses the standard
+ * MediaProjection consent dialog and is forwarded to the foreground service.
  */
 @CapacitorPlugin(
     name = "SubtitleOverlay",
@@ -61,6 +66,14 @@ class SubtitleOverlayPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun isSystemAudioSupported(call: PluginCall) {
+        call.resolve(
+            JSObject()
+                .put("supported", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        )
+    }
+
     private fun openOverlaySettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         try {
@@ -79,6 +92,12 @@ class SubtitleOverlayPlugin : Plugin() {
     fun start(call: PluginCall) {
         if (!canDrawOverlays()) {
             call.reject("Enable \"Display over other apps\" for SubTranslate first.")
+            return
+        }
+
+        val mode = call.getString("captureMode") ?: SubtitleOverlayService.MODE_MIC
+        if (mode == SubtitleOverlayService.MODE_SYSTEM) {
+            startSystemAudio(call)
             return
         }
 
@@ -109,6 +128,37 @@ class SubtitleOverlayPlugin : Plugin() {
         }
     }
 
+    private fun startSystemAudio(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            call.reject("System audio capture requires Android 10 or newer.")
+            return
+        }
+        try {
+            val manager = context.getSystemService(MediaProjectionManager::class.java)
+            startActivityForResult(
+                call,
+                manager.createScreenCaptureIntent(),
+                "projectionResult"
+            )
+        } catch (error: Exception) {
+            call.reject(error.message ?: "Could not open the screen-capture prompt.")
+        }
+    }
+
+    @ActivityCallback
+    private fun projectionResult(call: PluginCall, result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+            call.reject("Screen capture permission is required to hear Instagram audio.")
+            return
+        }
+        launchService(
+            call,
+            SubtitleOverlayService.ACTION_START,
+            result.resultCode,
+            result.data
+        )
+    }
+
     @PluginMethod
     fun update(call: PluginCall) {
         if (!canDrawOverlays()) {
@@ -129,10 +179,21 @@ class SubtitleOverlayPlugin : Plugin() {
         call.resolve(JSObject().put("running", SubtitleOverlayService.isRunning))
     }
 
-    private fun launchService(call: PluginCall, action: String) {
+    private fun launchService(
+        call: PluginCall,
+        action: String,
+        projectionResultCode: Int = Activity.RESULT_CANCELED,
+        projectionData: Intent? = null
+    ) {
         try {
+            val mode = call.getString("captureMode") ?: SubtitleOverlayService.MODE_MIC
             val intent = Intent(context, SubtitleOverlayService::class.java).apply {
                 this.action = action
+                putExtra(SubtitleOverlayService.EXTRA_CAPTURE_MODE, mode)
+                if (projectionData != null) {
+                    putExtra(SubtitleOverlayService.EXTRA_PROJECTION_RESULT_CODE, projectionResultCode)
+                    putExtra(SubtitleOverlayService.EXTRA_PROJECTION_DATA, projectionData)
+                }
             }
             call.data?.let { data ->
                 intent.putExtra(SubtitleOverlayService.EXTRA_FONT_SIZE, data.optInt("fontSize", 18))

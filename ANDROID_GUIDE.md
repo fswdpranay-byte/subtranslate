@@ -7,7 +7,7 @@ The app has two layers:
 | Layer | Tech | What it gives you |
 | --- | --- | --- |
 | App shell / UI | React + Vite + Capacitor | Dashboard, onboarding, settings, PWA install, in-browser overlay simulator |
-| Native overlay | Kotlin (`native/android`) | True system-wide floating subtitles over Instagram, TikTok, YouTube, etc. |
+| Native overlay | Kotlin (`android/app/src/main/java/com/subtranslate/app/`) | True system-wide floating subtitles over Instagram, TikTok, YouTube, etc. |
 
 The UI alone is fully usable as a PWA. The native layer is optional until you want the real "display over other apps" experience.
 
@@ -38,38 +38,48 @@ If `java -version` shows a different major version, set `JAVA_HOME` to the JDK 1
 
 ---
 
-## 2. Build the web app and add the Android platform
+## 2. Build the web app and sync the Android platform
+
+The `android/` project is **already committed** to this repository, including the Kotlin overlay sources, manifest entries, Gradle/Kotlin setup, and launcher icons. You do not need to regenerate it.
 
 From the repository root:
 
 ```powershell
 npm install
 npm run build:pwa
-npm run cap:add:android
+npm run cap:sync android
 ```
 
 What happens:
 
 - `build:pwa` runs `tsc --noEmit && vite build`, producing `dist/` including `sw.js`, `manifest.webmanifest` and the app shell.
-- `cap:add:android` generates the native project at `android/` using `capacitor.config.json` (`appId: com.subtranslate.app`, `webDir: dist`).
+- `cap:sync android` copies `dist/` and the plugin config into `android/app/src/main/assets/public`.
 
-You only run `cap:add:android` **once**. Afterwards:
-
-```powershell
-npm run cap:build     # vite build + npx cap sync android
-```
+If you ever delete `android/` and need to regenerate it, run `npm run cap:add:android`, then restore the native files from `native/android/` (see §3) and re-apply the manifest, Gradle, and icon changes.
 
 `cap:build` is the command to use after every frontend change — it rebuilds `dist/` and copies it (plus plugin config) into `android/app/src/main/assets/public`.
 
 > If `cap:add:android` fails with "android platform already exists", the folder is already generated — skip straight to `npm run cap:build`.
 
+### 2b. Build a debug APK without installing Android Studio
+
+The repo includes `.github/workflows/android.yml`, which builds a debug APK on GitHub's free runners (JDK 17 + Android SDK are preinstalled). This is the fastest way to get an installable APK on a phone.
+
+1. Push a change to `main` (or open **Actions → Android debug APK → Run workflow**).
+2. Wait for the green check (~4–6 minutes on the first run).
+3. Open the run → scroll to **Artifacts** → download **`subtranslate-debug-apk`**.
+4. Unzip it and install `app-debug.apk` on the phone (enable "Install unknown apps" for your browser/file manager).
+5. Grant **microphone**, **notifications**, and **Display over other apps** when the app asks.
+
+Debug APKs are signed with the debug key, so they install over USB/download but are **not** accepted by Play. Use §5–6 for a signed release bundle.
+
 ---
 
-## 3. Install the native overlay sources
+## 3. Native overlay sources
 
-The repo keeps the Kotlin reference implementation outside the generated folder so that regenerating `android/` never loses it.
+These are already installed in `android/app/src/main/java/com/subtranslate/app/`. The repo also keeps a copy under `native/android/` so that regenerating `android/` never loses them.
 
-Copy these files (create folders if needed):
+If you regenerated the platform, copy the files back (create folders if needed):
 
 ```text
 native/android/app/src/main/java/com/subtranslate/app/MainActivity.kt
@@ -103,7 +113,7 @@ class MainActivity : BridgeActivity() {
 
 ### Merge the manifest
 
-Open `android/app/src/main/AndroidManifest.xml` and add the entries from `native/android/AndroidManifest.additions.xml` **inside** the existing `<manifest>` element:
+The committed `android/app/src/main/AndroidManifest.xml` already contains these entries. If you regenerate the platform, add them **inside** the existing `<manifest>` element:
 
 ```xml
 <!-- Permissions -->
@@ -111,6 +121,7 @@ Open `android/app/src/main/AndroidManifest.xml` and add the entries from `native
 <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 <uses-permission android:name="android.permission.INTERNET" />
 
@@ -118,7 +129,7 @@ Open `android/app/src/main/AndroidManifest.xml` and add the entries from `native
 <service
     android:name=".SubtitleOverlayService"
     android:exported="false"
-    android:foregroundServiceType="microphone" />
+    android:foregroundServiceType="microphone|mediaProjection" />
 ```
 
 Notes:
@@ -126,7 +137,21 @@ Notes:
 - Do **not** duplicate `INTERNET` or `RECORD_AUDIO` if Capacitor already added them; duplicate `<uses-permission>` entries are harmless but noisy.
 - `SYSTEM_ALERT_WINDOW` is a special permission. It cannot be granted with a runtime dialog — the app must send the user to **Settings → Apps → Special app access → Display over other apps**. `requestOverlayPermission()` already does this.
 - `POST_NOTIFICATIONS` is needed on Android 13+ so the foreground-service notification is visible.
-- `foregroundServiceType="microphone"` plus `FOREGROUND_SERVICE_MICROPHONE` is mandatory on Android 14+. Without it the service crashes at start on API 34.
+- `foregroundServiceType="microphone|mediaProjection"` plus the matching `FOREGROUND_SERVICE_*` permissions is mandatory on Android 14+. Without them the service crashes at start on API 34.
+- System-audio mode needs `android/app/build.gradle` to include the offline engine:
+  ```gradle
+  implementation 'com.alphacephei:vosk-android:0.3.47'
+  ```
+  It is already added. The `MediaProjection` consent prompt appears every time the user starts system-audio mode; that is an Android requirement, not a bug.
+
+### Capture modes
+
+| Mode | Hears | Requirements |
+| --- | --- | --- |
+| Microphone | Sound in the room (phone speaker) | Android 6+, mic permission |
+| System audio | The audio Instagram/TikTok/YouTube is playing, even with headphones | Android 10+, screen-capture consent, one-time model download per source language |
+
+Both modes transcribe on-device. Only translated text is sent to the free translation endpoint, and only when translation is on.
 
 Then sync:
 
@@ -144,23 +169,28 @@ In `android/app/build.gradle`:
 ```gradle
 android {
     namespace "com.subtranslate.app"
-    compileSdk 34
+    compileSdk rootProject.ext.compileSdkVersion   // 34
 
     defaultConfig {
         applicationId "com.subtranslate.app"
-        minSdkVersion 23          // Capacitor 6 default
-        targetSdkVersion 34
+        minSdkVersion rootProject.ext.minSdkVersion    // 22
+        targetSdkVersion rootProject.ext.targetSdkVersion // 34
         versionCode 1             // integer, increment on every Play upload
         versionName "1.0.0"       // user-visible version
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
 }
 ```
 
 App name and launcher icon:
 
 - Name: `android/app/src/main/res/values/strings.xml` → `<string name="app_name">SubTranslate</string>`
-- Icon: **Android Studio → right-click `res` → New → Image Asset → Launcher Icons (Adaptive and Legacy)**. Use `public/icons/icon-512.png` as the foreground and `#0F172A` as the background.
-- Splash: **right-click `res` → New → Image Asset → Notification Icons** is not for splash; use `@capacitor/splash-screen` config already present in `capacitor.config.json` (background `#0F172A`).
+- Icons: run `npm run icons`. It regenerates the PWA icons **and**, when `android/` exists, the legacy, round, and adaptive launcher icons (foreground, background `#0F172A`) for every density.
+- Splash: `@capacitor/splash-screen` config is already present in `capacitor.config.json` (background `#0F172A`).
 
 Increase `versionCode` for **every** Play upload. Play rejects a bundle whose `versionCode` was already used.
 
@@ -268,6 +298,8 @@ Then verify on the device:
 - [ ] Live transcription works with the **Web Speech** engine (uses Android's `SpeechRecognizer` via WebView/Chrome).
 - [ ] **Display over other apps** settings opens and the toggle can be enabled.
 - [ ] Floating overlay appears over another app, is draggable, and the notification **Stop** action ends it.
+- [ ] **Instagram system audio:** Overlay page → **Capture Instagram audio** → accept the screen-capture prompt → open Instagram and play a video. The first run downloads the source-language model; captions should follow the video even with headphones or low volume.
+- [ ] Switch back to **Launch microphone overlay** and confirm captions resume from the mic.
 - [ ] Changing font size / background opacity / text colour in Settings updates the overlay live.
 - [ ] Wi-Fi off: app shell still loads (service worker) and cached translations still resolve.
 - [ ] Back button behaves (Capacitor `App` listener routes to the dashboard instead of closing mid-session).
@@ -291,7 +323,8 @@ Then verify on the device:
    - App icon 512×512 PNG, feature graphic 1024×500 PNG, at least 2 phone screenshots.
 5. **Data safety** — be accurate. SubTranslate:
    - Records audio **only while the user starts a session**.
-   - On-device engines do not upload audio.
+   - Microphone mode uses the device mic; system-audio mode captures app playback through Android's `MediaProjection`/`AudioPlaybackCapture`.
+   - On-device engines (Android `SpeechRecognizer`, Vosk) do not upload audio.
    - The optional Deepgram engine streams audio to Deepgram; disclose this and make it opt-in.
    - Text may be sent to MyMemory/LibreTranslate when translation is enabled; disclose it.
    - Supabase stores email + preferences if the user signs in.
@@ -303,6 +336,7 @@ Then verify on the device:
 ### Policy gotchas that get apps rejected
 
 - **Microphone + overlay**: both are sensitive. The store listing and in-app onboarding must explain exactly why. Never start listening without an explicit tap.
+- **Screen capture (`MediaProjection`)**: Play requires a prominent in-app disclosure that the app can capture everything on screen. SubTranslate uses it **only for audio**, immediately after an explicit tap, and the system consent dialog appears every session. Never start it silently or on app launch.
 - **Background microphone**: Android shows the green privacy indicator; that is expected. Do not attempt to hide it.
 - **Accessibility API**: do **not** use `AccessibilityService` to read other apps' audio or screen; SubTranslate uses the microphone and an overlay only.
 - **Data safety mismatch** is the most common rejection reason. If you add analytics or ads later, update the form.
@@ -351,7 +385,10 @@ After changing `.env`, always re-run `npm run cap:build`; the copied web assets 
 | Blank white screen in the app | Run `npm run cap:build`; check `android/app/src/main/assets/public/index.html` exists; inspect with `chrome://inspect` after enabling `webContentsDebuggingEnabled` |
 | Overlay never appears | Grant "Display over other apps"; on MIUI/ColorOS also enable "Display pop-up windows while running in background" and disable battery optimisation |
 | Service killed after a few minutes | OEM battery optimisation; ask users to set the app to **Unrestricted**; keep the foreground notification visible |
-| `SpeechRecognizer` unavailable | Device lacks Google speech service, or language pack missing; install Google app / offline speech data, or switch to the Whisper WASM engine |
+| `SpeechRecognizer` unavailable | Device lacks Google speech service, or language pack missing; install Google app / offline speech data, or use system-audio mode |
+| System audio shows "No app audio yet" | The app opted out of playback capture, or media is DRM-protected. Try another app/video, raise the media volume, or use microphone mode |
+| Model download fails | Check Wi-Fi; the model comes from `alphacephei.com`. Retry by stopping and starting system-audio mode. A failed download is deleted and retried |
+| No offline model for a language | Vosk small models cover ~28 languages. Pick a supported source language or use microphone mode |
 | Play rejects `versionCode` | Increment it; a code can never be reused |
 | Upload key lost | Play Console → App signing → request upload key reset; requires a new keystore and re-upload |
 
@@ -365,7 +402,7 @@ After changing `.env`, always re-run `npm run cap:build`; the copied web assets 
 | Signing | `keytool` | Free |
 | Hosting (PWA) | Vercel / Cloudflare Pages / Netlify | Generous free tiers |
 | Auth + DB | Supabase Free | 500 MB DB, 50k MAU |
-| Speech | Web Speech API / Android SpeechRecognizer | Free, device-dependent |
+| Speech | Web Speech API / Android SpeechRecognizer / Vosk (system audio) | Free, on-device, device-dependent |
 | Offline Whisper | `@xenova/transformers` WASM (CDN, cached by SW) | Free, CPU-heavy, first load ~40–80 MB |
 | Translation | MyMemory / LibreTranslate / offline phrasebook | Rate-limited but free |
 | Play Store | Google Play Developer account | **$25 one-time** (only if publishing) |
