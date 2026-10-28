@@ -67,9 +67,15 @@ The repo includes `.github/workflows/android.yml`, which builds a debug APK on G
 
 1. Push a change to `main` (or open **Actions → Android debug APK → Run workflow**).
 2. Wait for the green check (~4–6 minutes on the first run).
-3. Open the run → scroll to **Artifacts** → download **`subtranslate-debug-apk`**.
-4. Unzip it and install `app-debug.apk` on the phone (enable "Install unknown apps" for your browser/file manager).
+3. Download the rolling build directly:
+
+   <https://github.com/fswdpranay-byte/subtranslate/releases/download/android-latest/subtranslate-debug.apk>
+
+   You can also open the run → **Artifacts** → **`subtranslate-debug-apk`**.
+4. Install it on the phone (enable "Install unknown apps" for your browser/file manager).
 5. Grant **microphone**, **notifications**, and **Display over other apps** when the app asks.
+
+> Debug builds are signed with a throwaway key per CI run. If Android says "App not installed" when updating, uninstall the old copy first.
 
 Debug APKs are signed with the debug key, so they install over USB/download but are **not** accepted by Play. Use §5–6 for a signed release bundle.
 

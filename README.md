@@ -118,21 +118,33 @@ Translation is applied to **final** segments only. Results are cached in `localS
 
 ## Android
 
-See **[ANDROID_GUIDE.md](./ANDROID_GUIDE.md)** for the complete path from `npm run build:pwa` to a signed `.aab` in the Play Console, including:
+**Install the latest build (no Android Studio needed):**
 
-- Capacitor platform generation and asset sync
-- copying the Kotlin overlay sources and merging the manifest
-- `SYSTEM_ALERT_WINDOW` / `FOREGROUND_SERVICE_MICROPHONE` requirements on Android 13/14
+<https://github.com/fswdpranay-byte/subtranslate/releases/download/android-latest/subtranslate-debug.apk>
+
+The GitHub Actions workflow rebuilds this **debug APK** on every push to `main`. On the phone: open the link, allow "Install unknown apps", install, then grant microphone, notifications, and **Display over other apps**.
+
+### Two capture modes
+
+| Mode | What it hears | Requirements |
+| --- | --- | --- |
+| Microphone | Sound in the room | Android 6+, mic permission |
+| System audio | The audio **Instagram/TikTok/YouTube is playing** (headphones work) | Android 10+, screen-capture consent, one-time offline model download |
+
+System audio uses `MediaProjection` + `AudioPlaybackCapture` and transcribes fully on-device with [Vosk](https://alphacephei.com/vosk/). Open **Overlay → Capture Instagram audio**, accept the prompt, then play a video. No audio is uploaded.
+
+See **[ANDROID_GUIDE.md](./ANDROID_GUIDE.md)** for the complete path from source to a signed `.aab` in the Play Console, including:
+
+- Capacitor platform sync and native overlay sources
+- `SYSTEM_ALERT_WINDOW` / `FOREGROUND_SERVICE_MICROPHONE` / `FOREGROUND_SERVICE_MEDIA_PROJECTION` requirements
 - keystore creation and Gradle signing config
 - Play Console listing, data-safety answers, and policy gotchas
 
-Quick version:
+Quick version (local build):
 
 ```powershell
 npm run build:pwa
-npm run cap:add:android
-# copy native/android/**/*.kt and manifest entries
-npm run cap:build
+npm run cap:sync android
 npm run cap:open
 ```
 
