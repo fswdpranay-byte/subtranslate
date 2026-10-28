@@ -18,6 +18,7 @@ export function useNativeOverlay() {
   const [permission, setPermission] = useState<boolean | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [systemAudioSupported, setSystemAudioSupported] = useState(false);
   const preferences = usePreferencesStore((state) => state.preferences);
 
@@ -67,6 +68,7 @@ export function useNativeOverlay() {
         return false;
       }
       setBusy(true);
+      setError(null);
       try {
         const granted = await checkOverlayPermission();
         setPermission(granted);
@@ -116,6 +118,7 @@ export function useNativeOverlay() {
               ? String((error as { message: unknown }).message)
               : 'The native overlay service rejected the request.';
         toast('Could not start overlay', message, 'error');
+        setError(message);
         return false;
       } finally {
         setBusy(false);
@@ -127,6 +130,7 @@ export function useNativeOverlay() {
 
   const stop = useCallback(async (): Promise<void> => {
     setBusy(true);
+    setError(null);
     try {
       await stopNativeOverlay();
       setRunning(false);
@@ -153,6 +157,7 @@ export function useNativeOverlay() {
     permission,
     running,
     busy,
+    error,
     start,
     stop,
     update,

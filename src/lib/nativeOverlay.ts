@@ -42,6 +42,9 @@ interface SubtitleOverlayPlugin {
   checkPermission: () => Promise<PermissionResult>;
   requestPermission: () => Promise<PermissionResult>;
   openSettings: () => Promise<void>;
+  checkMicrophonePermission: () => Promise<PermissionResult>;
+  requestMicrophonePermission: () => Promise<PermissionResult>;
+  openAppSettings: () => Promise<void>;
   isSystemAudioSupported: () => Promise<SystemAudioResult>;
   start: (options: NativeOverlayConfig) => Promise<void>;
   stop: () => Promise<void>;
@@ -98,6 +101,43 @@ export async function openOverlaySettings(): Promise<boolean> {
   if (!isAndroidNative) return false;
   try {
     await SubtitleOverlay.openSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Checks the Android runtime microphone grant (RECORD_AUDIO) without prompting. */
+export async function checkNativeMicrophonePermission(): Promise<boolean> {
+  if (!isAndroidNative) return false;
+  try {
+    const result = await SubtitleOverlay.checkMicrophonePermission();
+    return result.granted;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shows the Android microphone prompt. Resolves `false` when the user denies it
+ * (including a permanent "don't ask again" denial), so callers can surface
+ * app-settings guidance.
+ */
+export async function requestNativeMicrophonePermission(): Promise<boolean> {
+  if (!isAndroidNative) return false;
+  try {
+    const result = await SubtitleOverlay.requestMicrophonePermission();
+    return result.granted;
+  } catch {
+    return false;
+  }
+}
+
+/** Opens this app's Android settings screen (permissions, notifications, battery). */
+export async function openAppSettings(): Promise<boolean> {
+  if (!isAndroidNative) return false;
+  try {
+    await SubtitleOverlay.openAppSettings();
     return true;
   } catch {
     return false;

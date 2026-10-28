@@ -421,6 +421,7 @@ After changing `.env`, always re-run `npm run cap:build`; the copied web assets 
 | Overlay never appears | Grant "Display over other apps"; on MIUI/ColorOS also enable "Display pop-up windows while running in background" and disable battery optimisation |
 | Service killed after a few minutes | OEM battery optimisation; ask users to set the app to **Unrestricted**; keep the foreground notification visible |
 | `SpeechRecognizer` unavailable | Device lacks Google speech service, or language pack missing; install Google app / offline speech data, or use system-audio mode |
+| Microphone button does nothing / permission denied | Settings → Apps → SubTranslate → Permissions → Microphone → **Allow**, then reopen the app. The APK asks Android directly; it never relies on the WebView browser prompt |
 | System audio shows "No app audio yet" | The app opted out of playback capture, or media is DRM-protected. Try another app/video, raise the media volume, or use microphone mode |
 | Model download fails | Check Wi-Fi; the model comes from `alphacephei.com`. Retry by stopping and starting system-audio mode. A failed download is deleted and retried |
 | No offline model for a language | Vosk small models cover ~28 languages. Pick a supported source language or use microphone mode |

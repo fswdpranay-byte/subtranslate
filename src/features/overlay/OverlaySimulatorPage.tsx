@@ -64,6 +64,7 @@ export function OverlaySimulatorPage() {
   const { isLive, start, stop, status } = useTranscription();
   const demo = useDemoCaptions();
   const nativeOverlay = useNativeOverlay();
+  const overlayLive = nativeOverlay.isSupported ? nativeOverlay.running : isLive;
 
   // Captions accumulate instead of replacing each other, so the floating card
   // reads like a continuous sentence group (same behaviour as the native card).
@@ -87,10 +88,11 @@ export function OverlaySimulatorPage() {
   );
 
   const modeLabel = useMemo(() => {
+    if (nativeOverlay.isSupported) return nativeOverlay.running ? 'Native overlay' : 'Idle';
     if (isLive) return 'Live microphone';
     if (demo.running) return 'Demo playback';
     return 'Idle';
-  }, [isLive, demo.running]);
+  }, [isLive, demo.running, nativeOverlay.isSupported, nativeOverlay.running]);
 
   const snapToPosition = (position: SubtitlePosition) => {
     updateSubtitle({ position });
@@ -101,6 +103,16 @@ export function OverlaySimulatorPage() {
   };
 
   const handleGoLive = async () => {
+    // Android WebView cannot run Web Speech, so drive the native overlay there.
+    if (nativeOverlay.isSupported) {
+      if (nativeOverlay.running) {
+        await nativeOverlay.stop();
+        return;
+      }
+      demo.stop();
+      await nativeOverlay.start('microphone');
+      return;
+    }
     if (isLive) {
       await stop();
       return;
@@ -137,7 +149,11 @@ export function OverlaySimulatorPage() {
             <span
               className={cn(
                 'h-1.5 w-1.5 rounded-full',
-                isLive ? 'animate-pulse bg-rose-400' : demo.running ? 'bg-brand-400' : 'bg-ink-500',
+                overlayLive
+                  ? 'animate-pulse bg-rose-400'
+                  : demo.running
+                    ? 'bg-brand-400'
+                    : 'bg-ink-500',
               )}
             />
             {modeLabel}
@@ -146,19 +162,35 @@ export function OverlaySimulatorPage() {
             size="sm"
             variant="secondary"
             onClick={() => (demo.running ? demo.stop() : demo.start())}
-            disabled={isLive}
+            disabled={overlayLive}
             leftIcon={demo.running ? <Square className="h-3 w-3 fill-current" /> : <Clapperboard className="h-3 w-3" />}
           >
             {demo.running ? 'Stop demo' : 'Demo captions'}
           </Button>
           <Button
             size="sm"
-            variant={isLive ? 'danger' : 'primary'}
-            loading={status === 'starting' || status === 'stopping'}
+            variant={overlayLive ? 'danger' : 'primary'}
+            loading={
+              nativeOverlay.isSupported
+                ? nativeOverlay.busy
+                : status === 'starting' || status === 'stopping'
+            }
             onClick={() => void handleGoLive()}
-            leftIcon={isLive ? <Square className="h-3 w-3 fill-current" /> : <Radio className="h-3 w-3" />}
+            leftIcon={
+              overlayLive ? (
+                <Square className="h-3 w-3 fill-current" />
+              ) : (
+                <Radio className="h-3 w-3" />
+              )
+            }
           >
-            {isLive ? 'Stop mic' : 'Go live'}
+            {overlayLive
+              ? nativeOverlay.isSupported
+                ? 'Stop overlay'
+                : 'Stop mic'
+              : nativeOverlay.isSupported
+                ? 'Launch overlay'
+                : 'Go live'}
           </Button>
         </div>
       </div>

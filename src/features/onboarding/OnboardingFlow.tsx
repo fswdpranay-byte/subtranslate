@@ -22,6 +22,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { SubtitleCard } from '@/components/SubtitleCard';
 import { toast } from '@/store/useUiStore';
 import { isAndroidNative, requestOverlayPermission } from '@/lib/nativeOverlay';
+import { useNativeOverlay } from '@/hooks/useNativeOverlay';
 
 const STEPS = ['Welcome', 'Microphone', 'Overlay', 'Test'];
 
@@ -203,7 +204,14 @@ function MicrophoneStep({ onContinue }: StepProps) {
   const handleAllow = async () => {
     const ok = await request();
     markMicGranted(ok);
-    if (ok) toast('Microphone ready', 'You can revoke access any time in your browser settings.', 'success');
+    if (!ok) return;
+    toast(
+      'Microphone ready',
+      isAndroidNative
+        ? 'Android granted microphone access to SubTranslate. Captions run in the floating overlay.'
+        : 'You can revoke access any time in your browser settings.',
+      'success',
+    );
   };
 
   return (
@@ -235,8 +243,10 @@ function MicrophoneStep({ onContinue }: StepProps) {
         {[
           {
             icon: Cpu,
-            title: 'Whisper runs 100% on-device',
-            text: 'Model inference happens locally in WebAssembly. No audio leaves your phone.',
+            title: isAndroidNative ? 'Native speech on your phone' : 'Whisper runs 100% on-device',
+            text: isAndroidNative
+              ? 'Android’s speech service handles live captions, with an optional offline Vosk model for Instagram audio.'
+              : 'Model inference happens locally in WebAssembly. No audio leaves your phone.',
           },
           {
             icon: Lock,
@@ -262,10 +272,17 @@ function MicrophoneStep({ onContinue }: StepProps) {
         ))}
       </div>
 
-      {permission === 'unsupported' ? (
+      {permission === 'unsupported' && !isAndroidNative ? (
         <p className="mt-3 rounded-xl border border-amber-400/15 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
           This browser build does not expose microphone capture. You can still explore the demo in
           the next step.
+        </p>
+      ) : null}
+
+      {isAndroidNative ? (
+        <p className="mt-3 rounded-xl border border-brand-400/15 bg-brand-400/5 px-3 py-2 text-[11px] leading-relaxed text-brand-200/80">
+          Android asks for microphone access directly. Once granted, captions run in a floating card
+          above Instagram and other apps — no browser permission prompt is involved.
         </p>
       ) : null}
 
@@ -306,8 +323,9 @@ function MicrophoneStep({ onContinue }: StepProps) {
       </div>
 
       <p className="mt-3 text-center text-[9px] leading-relaxed text-ink-400">
-        Heads-up: Chrome’s built-in SpeechRecognition may use the browser vendor’s cloud. Choose
-        Whisper for fully local inference.
+        {isAndroidNative
+          ? 'Android uses its native speech service. Choose microphone mode for the mic, or system mode to hear Instagram’s audio.'
+          : 'Heads-up: Chrome’s built-in SpeechRecognition may use the browser vendor’s cloud. Choose Whisper for fully local inference.'}
       </p>
     </div>
   );
@@ -414,6 +432,9 @@ function OverlayStep({ onContinue }: StepProps) {
 
 function TestPlayerStep({ onContinue }: StepProps) {
   const { start, stop, isLive, status } = useTranscription();
+  const native = useNativeOverlay();
+  const nativeMode = native.isSupported;
+  const live = nativeMode ? native.running : isLive;
   const preferences = usePreferencesStore((state) => state.preferences);
   const segments = useSessionStore((state) => state.segments);
   const interim = useSessionStore((state) => state.interim);
@@ -462,6 +483,19 @@ function TestPlayerStep({ onContinue }: StepProps) {
   };
 
   const handleTest = async () => {
+    if (nativeMode) {
+      if (native.running) {
+        await native.stop();
+        return;
+      }
+      if (demoTimer.current !== null) {
+        window.clearInterval(demoTimer.current);
+        demoTimer.current = null;
+      }
+      setDemoMode(false);
+      await native.start('microphone');
+      return;
+    }
     if (isLive) {
       await stop();
       return;
@@ -484,8 +518,9 @@ function TestPlayerStep({ onContinue }: StepProps) {
         </Badge>
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-white">Test live captions</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-400">
-          Speak a sentence or play the demo. This is the exact subtitle card that floats over your
-          other apps.
+          {nativeMode
+            ? 'Launch the floating overlay, then open Instagram. Captions stay above the app. You can also play the demo first.'
+            : 'Speak a sentence or play the demo. This is the exact subtitle card that floats over your other apps.'}
         </p>
       </div>
 
@@ -508,12 +543,12 @@ function TestPlayerStep({ onContinue }: StepProps) {
           <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/30 px-2 py-0.5 text-[9px] text-white/80 backdrop-blur">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                isLive ? 'animate-pulse bg-rose-400' : demoMode ? 'bg-brand-400' : 'bg-white/40'
+                live ? 'animate-pulse bg-rose-400' : demoMode ? 'bg-brand-400' : 'bg-white/40'
               }`}
             />
-            {isLive ? 'Listening' : demoMode ? 'Demo' : 'Ready'}
+            {live ? 'Listening' : demoMode ? 'Demo' : 'Ready'}
           </div>
-          {isLive ? (
+          {live && !nativeMode ? (
             <div className="absolute right-3 top-3 flex items-end gap-0.5">
               {[6, 10, 14, 8].map((height, index) => (
                 <span
@@ -532,20 +567,33 @@ function TestPlayerStep({ onContinue }: StepProps) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            variant={isLive ? 'danger' : 'primary'}
-            loading={starting || status === 'starting' || status === 'stopping'}
+            variant={live ? 'danger' : 'primary'}
+            loading={
+              nativeMode
+                ? native.busy
+                : starting || status === 'starting' || status === 'stopping'
+            }
             onClick={() => {
               void handleTest();
             }}
             leftIcon={<Mic className="h-3.5 w-3.5" />}
           >
-            {isLive ? 'Stop test' : 'Start microphone test'}
+            {live
+              ? nativeMode
+                ? 'Stop floating overlay'
+                : 'Stop test'
+              : nativeMode
+                ? 'Launch floating overlay'
+                : 'Start microphone test'}
           </Button>
           <Button
             size="sm"
             variant="secondary"
             onClick={() => {
-              if (isLive) void stop();
+              if (live) {
+                if (nativeMode) void native.stop();
+                else void stop();
+              }
               playDemo();
             }}
             leftIcon={<Sparkles className="h-3.5 w-3.5" />}
@@ -553,7 +601,11 @@ function TestPlayerStep({ onContinue }: StepProps) {
             Play demo
           </Button>
           <span className="ml-auto text-[10px] text-ink-400">
-            {preferences.engine === 'whisper' ? 'Whisper · on-device' : 'Browser speech · free'}
+            {nativeMode
+              ? 'Android native speech'
+              : preferences.engine === 'whisper'
+                ? 'Whisper · on-device'
+                : 'Browser speech · free'}
           </span>
         </div>
       </div>

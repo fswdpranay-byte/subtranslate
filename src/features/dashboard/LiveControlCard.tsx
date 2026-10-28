@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Languages, Loader2, Mic, MicOff, Square } from 'lucide-react';
+import { Activity, ArrowRight, Languages, Loader2, Mic, MicOff, Settings, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,20 +8,31 @@ import { SubtitleCard } from '@/components/SubtitleCard';
 import { useTranscription } from '@/features/transcription/TranscriptionProvider';
 import { useSessionStore } from '@/store/useSessionStore';
 import { usePreferencesStore } from '@/store/usePreferencesStore';
+import { useNativeOverlay } from '@/hooks/useNativeOverlay';
 import { useElapsed } from '@/hooks/useElapsed';
+import { openAppSettings } from '@/lib/nativeOverlay';
 import { getEngineDescriptors } from '@/services/transcription';
 import { cn } from '@/lib/utils';
 
 export function LiveControlCard() {
   const { start, stop, isLive, status } = useTranscription();
+  const native = useNativeOverlay();
   const startedAt = useSessionStore((state) => state.startedAt);
   const inputLevel = useSessionStore((state) => state.inputLevel);
   const segments = useSessionStore((state) => state.segments);
   const interim = useSessionStore((state) => state.interim);
-  const error = useSessionStore((state) => state.error);
+  const engineError = useSessionStore((state) => state.error);
   const detail = useSessionStore((state) => state.lastEngineDetail);
   const preferences = usePreferencesStore((state) => state.preferences);
   const elapsed = useElapsed(startedAt);
+
+  // Android WebView cannot reliably run Web Speech / getUserMedia, and captions
+  // must float over Instagram anyway, so the primary control drives the native
+  // overlay service there.
+  const nativeMode = native.isSupported;
+  const live = nativeMode ? native.running : isLive;
+  const busy = nativeMode ? native.busy : status === 'starting' || status === 'stopping';
+  const error = nativeMode ? native.error : engineError;
 
   const latest = [...segments].reverse().find((segment) => segment.isFinal);
   const original = interim || latest?.original || '';
@@ -29,10 +40,15 @@ export function LiveControlCard() {
   const pending = Boolean(latest && latest.translationState === 'pending' && !interim);
   const engine = getEngineDescriptors().find((item) => item.id === preferences.engine);
   const permissionBlocked = Boolean(
-    error && /blocked|not-allowed|permission|denied/i.test(error),
+    !nativeMode && error && /blocked|not-allowed|permission|denied/i.test(error),
   );
 
   const handleToggle = async () => {
+    if (nativeMode) {
+      if (native.running) await native.stop();
+      else await native.start('microphone');
+      return;
+    }
     if (isLive) {
       await stop();
       return;
@@ -47,7 +63,7 @@ export function LiveControlCard() {
 
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex shrink-0 items-center justify-center">
-          {isLive ? (
+          {live ? (
             <>
               <span className="absolute inset-0 rounded-full bg-brand-400/30 animate-pulse-ring" />
               <span className="absolute inset-0 rounded-full bg-brand-400/20 animate-pulse-ring [animation-delay:600ms]" />
@@ -56,18 +72,18 @@ export function LiveControlCard() {
           <button
             type="button"
             onClick={() => void handleToggle()}
-            disabled={status === 'starting' || status === 'stopping'}
-            aria-label={isLive ? 'Stop live captions' : 'Start live captions'}
+            disabled={busy}
+            aria-label={live ? 'Stop live captions' : 'Start live captions'}
             className={cn(
               'relative z-10 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-4 focus-visible:ring-offset-ink-900 disabled:opacity-70',
-              isLive
+              live
                 ? 'border-rose-300/40 bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-[0_18px_50px_-15px_rgba(244,63,94,0.9)]'
                 : 'border-brand-300/40 bg-gradient-to-br from-brand-400 to-brand-600 text-ink-950 shadow-[0_18px_50px_-15px_rgba(34,211,238,0.9)] hover:scale-[1.03]',
             )}
           >
-            {status === 'starting' || status === 'stopping' ? (
+            {busy ? (
               <Loader2 className="h-8 w-8 animate-spin" />
-            ) : isLive ? (
+            ) : live ? (
               <Square className="h-7 w-7 fill-current" />
             ) : (
               <Mic className="h-8 w-8" />
@@ -78,43 +94,58 @@ export function LiveControlCard() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold tracking-tight text-white">
-              {isLive ? 'Captions are live' : status === 'error' ? 'Engine stopped' : 'Ready when you are'}
+              {live
+                ? nativeMode
+                  ? 'Floating captions are live'
+                  : 'Captions are live'
+                : !nativeMode && status === 'error'
+                  ? 'Engine stopped'
+                  : 'Ready when you are'}
             </h2>
-            {isLive ? (
+            {live ? (
               <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 ring-1 ring-inset ring-rose-400/30">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
                 Recording
               </span>
             ) : null}
             <Badge tone="brand" icon={<Activity className="h-2.5 w-2.5" />}>
-              {engine?.mode === 'trial' ? 'Trial API' : 'On-device'}
+              {nativeMode ? 'Native overlay' : engine?.mode === 'trial' ? 'Trial API' : 'On-device'}
             </Badge>
           </div>
 
           <p className="mt-1.5 max-w-prose text-xs leading-relaxed text-ink-400">
-            {isLive
-              ? (detail ?? 'Listening through your microphone. Open any app — captions stay in this session.')
-              : status === 'error'
+            {live
+              ? ((!nativeMode ? detail : null) ??
+                (nativeMode
+                  ? 'Listening through Android’s native speech service. Open Instagram — the caption card stays above it.'
+                  : 'Listening through your microphone. Open any app — captions stay in this session.'))
+              : !nativeMode && status === 'error'
                 ? 'Fix the issue below, then start again. Your transcript is preserved.'
-                : 'Tap the mic and allow microphone access. Your first captions appear in a few seconds.'}
+                : nativeMode
+                  ? 'Tap the mic to float captions over other apps. For Instagram’s own audio, use system capture.'
+                  : 'Tap the mic and allow microphone access. Your first captions appear in a few seconds.'}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-lg bg-ink-950/60 px-2.5 py-1.5 ring-1 ring-inset ring-white/[0.07]">
-              <span className={cn('h-1.5 w-1.5 rounded-full', isLive ? 'bg-emerald-400' : 'bg-ink-500')} />
+              <span className={cn('h-1.5 w-1.5 rounded-full', live ? 'bg-emerald-400' : 'bg-ink-500')} />
               <span className="font-mono text-xs tabular-nums text-ink-200">{elapsed}</span>
-              <span className="text-[10px] text-ink-400">{isLive ? 'elapsed' : 'idle'}</span>
+              <span className="text-[10px] text-ink-400">{live ? 'elapsed' : 'idle'}</span>
             </div>
-            <LevelMeter level={inputLevel} active={isLive} />
+            <LevelMeter level={inputLevel} active={live} />
             <span className="text-[10px] font-medium text-ink-400">
-              {engine?.shortName ?? 'Engine'} · {preferences.sourceLang === 'auto' ? 'auto-detect' : preferences.sourceLang.toUpperCase()}
+              {nativeMode
+                ? 'Native speech'
+                : (engine?.shortName ?? 'Engine')}{' '}
+              · {preferences.sourceLang === 'auto' ? 'auto-detect' : preferences.sourceLang.toUpperCase()}
               {preferences.targetLang !== 'none' ? ` → ${preferences.targetLang.toUpperCase()}` : ''}
             </span>
             <Link
               to="/overlay"
               className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-brand-300 transition hover:text-brand-200"
             >
-              Overlay simulator <ArrowRight className="h-3 w-3" />
+              {nativeMode ? 'Overlay & Instagram audio' : 'Overlay simulator'}{' '}
+              <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
         </div>
@@ -126,10 +157,17 @@ export function LiveControlCard() {
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
               <Languages className="h-3 w-3" /> Live subtitle preview
             </span>
-            <span className="text-[10px] text-ink-400">drag &amp; style in the simulator</span>
+            <span className="text-[10px] text-ink-400">
+              {nativeMode ? 'appears in the floating card' : 'drag & style in the simulator'}
+            </span>
           </div>
           <SubtitleCard
-            original={original || 'Tap the microphone to see your speech appear here in real time.'}
+            original={
+              original ||
+              (nativeMode
+                ? 'Captions appear in the floating card above Instagram and other apps.'
+                : 'Tap the microphone to see your speech appear here in real time.')
+            }
             translated={translated}
             style={preferences.subtitle}
             compact
@@ -145,7 +183,31 @@ export function LiveControlCard() {
             <MicOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {error}
           </p>
-          {permissionBlocked ? (
+          {nativeMode ? (
+            <>
+              <p className="mt-1.5 pl-[22px] text-[10px] leading-relaxed text-rose-200/70">
+                Check Settings → Apps → SubTranslate → Permissions → Microphone, and set the app’s
+                battery usage to Unrestricted so Android keeps the overlay service alive.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 px-2 text-[10px]"
+                  leftIcon={<Settings className="h-3 w-3" />}
+                  onClick={() => void openAppSettings()}
+                >
+                  Open app settings
+                </Button>
+                <Link
+                  to="/overlay"
+                  className="text-[10px] font-medium text-rose-200/80 underline underline-offset-2 hover:text-rose-100"
+                >
+                  Overlay setup
+                </Link>
+              </div>
+            </>
+          ) : permissionBlocked ? (
             <>
               <p className="mt-1.5 pl-[22px] text-[10px] leading-relaxed text-rose-200/70">
                 Allow the microphone for <span className="font-mono text-rose-100">{window.location.host}</span>,
@@ -175,7 +237,7 @@ export function LiveControlCard() {
               size="sm"
               variant="secondary"
               className="mt-2 h-7 px-2 text-[10px]"
-              onClick={() => void start()}
+              onClick={() => void handleToggle()}
             >
               Try again
             </Button>

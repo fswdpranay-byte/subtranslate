@@ -66,6 +66,59 @@ class SubtitleOverlayPlugin : Plugin() {
         call.resolve()
     }
 
+    /**
+     * Native microphone permission, used by onboarding and the dashboard.
+     *
+     * Android WebView `getUserMedia` is unreliable across OEM WebView builds, so
+     * the web layer asks the Android runtime directly and then uses the native
+     * speech service instead of the browser capture path.
+     */
+    @PluginMethod
+    fun checkMicrophonePermission(call: PluginCall) {
+        call.resolve(
+            JSObject().put(
+                "granted",
+                getPermissionState("microphone") == PermissionState.GRANTED
+            )
+        )
+    }
+
+    @PluginMethod
+    fun requestMicrophonePermission(call: PluginCall) {
+        if (getPermissionState("microphone") == PermissionState.GRANTED) {
+            call.resolve(JSObject().put("granted", true))
+            return
+        }
+        requestPermissionForAlias("microphone", call, "microphoneCallback")
+    }
+
+    @PermissionCallback
+    private fun microphoneCallback(call: PluginCall) {
+        // Resolve instead of rejecting so the web layer can show Android-specific
+        // "open app settings" guidance after a permanent denial.
+        call.resolve(
+            JSObject().put(
+                "granted",
+                getPermissionState("microphone") == PermissionState.GRANTED
+            )
+        )
+    }
+
+    @PluginMethod
+    fun openAppSettings(call: PluginCall) {
+        try {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}")
+            )
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            call.resolve()
+        } catch (error: Exception) {
+            call.reject(error.message ?: "Could not open Android app settings.")
+        }
+    }
+
     @PluginMethod
     fun isSystemAudioSupported(call: PluginCall) {
         call.resolve(
