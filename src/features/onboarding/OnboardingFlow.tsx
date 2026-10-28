@@ -21,7 +21,7 @@ import { useTranscription } from '@/features/transcription/TranscriptionProvider
 import { useSessionStore } from '@/store/useSessionStore';
 import { SubtitleCard } from '@/components/SubtitleCard';
 import { toast } from '@/store/useUiStore';
-import { isAndroidNative, requestOverlayPermission } from '@/lib/nativeOverlay';
+import { isAndroidNative, openAppSettings, requestOverlayPermission } from '@/lib/nativeOverlay';
 import { useNativeOverlay } from '@/hooks/useNativeOverlay';
 
 const STEPS = ['Welcome', 'Microphone', 'Overlay', 'Test'];
@@ -287,9 +287,18 @@ function MicrophoneStep({ onContinue }: StepProps) {
       ) : null}
 
       {error ? (
-        <p className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/5 px-3 py-2 text-[11px] leading-relaxed text-rose-200/90">
-          {error}
-        </p>
+        <div className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/5 px-3 py-2">
+          <p className="text-[11px] leading-relaxed text-rose-200/90">{error}</p>
+          {isAndroidNative ? (
+            <button
+              type="button"
+              onClick={() => void openAppSettings()}
+              className="mt-2 text-[11px] font-semibold text-rose-200 underline underline-offset-2 hover:text-rose-100"
+            >
+              Open Android app settings
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-5 space-y-2">
