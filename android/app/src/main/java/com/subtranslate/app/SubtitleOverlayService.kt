@@ -393,23 +393,55 @@ class SubtitleOverlayService : Service(), RecognitionListener {
     }
 
     /** Append a finalized phrase and keep the last few lines visible together. */
-    private fun rememberOriginal(text: String) {
+    private fun rememberOriginal(text: String): String? {
         val line = text.trim()
-        if (line.isEmpty()) return
-        if (originalLines.lastOrNull() == line) return
-        originalLines.addLast(line)
+        if (line.isEmpty()) return null
+
+        val delta: String
+        if (originalLines.isEmpty()) {
+            originalLines.addLast(line)
+            delta = line
+        } else {
+            val previous = originalLines.last()
+            val merged = mergeStreamingText(previous, line)
+            when {
+                merged == previous -> return null
+                merged == normalizeCaption("$previous $line") -> {
+                    originalLines.addLast(line)
+                    delta = line
+                }
+                else -> {
+                    // Cumulative result: the engine repeated earlier words.
+                    originalLines[originalLines.lastIndex] = merged
+                    delta = merged.removePrefix(previous).trim()
+                }
+            }
+        }
+
         while (originalLines.size > maxCaptionLines) originalLines.removeFirst()
         currentOriginal = originalLines.joinToString(" ")
         // Keep earlier translations visible while the newest phrase is translated.
         currentTranslated = translatedLines.joinToString(" ")
+        return delta.ifEmpty { null }
     }
 
     /** Append a completed translation so converted captions also continue. */
     private fun rememberTranslated(text: String) {
         val line = text.trim()
         if (line.isEmpty()) return
-        if (translatedLines.lastOrNull() == line) return
-        translatedLines.addLast(line)
+
+        if (translatedLines.isEmpty()) {
+            translatedLines.addLast(line)
+        } else {
+            val previous = translatedLines.last()
+            val merged = mergeStreamingText(previous, line)
+            when {
+                merged == previous -> return
+                merged == normalizeCaption("$previous $line") -> translatedLines.addLast(line)
+                else -> translatedLines[translatedLines.lastIndex] = merged
+            }
+        }
+
         while (translatedLines.size > maxCaptionLines) translatedLines.removeFirst()
         currentTranslated = translatedLines.joinToString(" ")
     }
@@ -417,9 +449,10 @@ class SubtitleOverlayService : Service(), RecognitionListener {
     /** Show the live partial phrase after the finalized lines. */
     private fun showPartial(partial: String) {
         val line = partial.trim()
+        val finished = originalLines.joinToString(" ")
         currentOriginal =
-            if (line.isEmpty()) originalLines.joinToString(" ")
-            else (originalLines + line).joinToString(" ")
+            if (line.isEmpty()) finished
+            else mergeStreamingText(finished, line)
     }
 
     private fun clearTranscript() {
@@ -428,6 +461,74 @@ class SubtitleOverlayService : Service(), RecognitionListener {
         currentOriginal = ""
         currentTranslated = ""
         render()
+    }
+
+    private fun normalizeCaption(value: String): String =
+        value.replace(Regex("\\s+"), " ").trim()
+
+    /** Compare words without surrounding punctuation so overlap detection is stable. */
+    private fun captionWords(value: String): List<String> =
+        value
+            .split(Regex("\\s+"))
+            .map { word ->
+                word
+                    .trim { it in ".,!?;:\"'“”‘’()[]{}—–-…" }
+                    .lowercase()
+            }
+            .filter { it.isNotEmpty() }
+
+    /**
+     * Collapse cumulative recognizer output. SpeechRecognizer and Vosk often
+     * re-send the whole phrase so far; appending it verbatim repeated every
+     * earlier word. This keeps each spoken word on screen exactly once.
+     */
+    private fun mergeStreamingText(base: String, incoming: String): String {
+        val current = normalizeCaption(base)
+        val next = normalizeCaption(incoming)
+        if (current.isEmpty()) return next
+        if (next.isEmpty()) return current
+
+        val currentWords = captionWords(current)
+        val nextWords = captionWords(next)
+
+        if (currentWords == nextWords) return current
+
+        if (
+            nextWords.size > currentWords.size &&
+            nextWords.subList(0, currentWords.size) == currentWords
+        ) {
+            return next
+        }
+
+        if (
+            currentWords.size > nextWords.size &&
+            currentWords.subList(0, nextWords.size) == nextWords
+        ) {
+            return current
+        }
+
+        val maxOverlap = minOf(currentWords.size, nextWords.size, 16)
+        for (size in maxOverlap downTo 2) {
+            if (currentWords.subList(currentWords.size - size, currentWords.size) ==
+                nextWords.subList(0, size)
+            ) {
+                val nextWordsOriginal = next.split(Regex("\\s+"))
+                return normalizeCaption(
+                    "$current ${nextWordsOriginal.drop(size).joinToString(" ")}"
+                )
+            }
+        }
+
+        // A lone word that is already the last word on screen is a duplicate.
+        if (
+            nextWords.size == 1 &&
+            currentWords.isNotEmpty() &&
+            currentWords.last() == nextWords.first()
+        ) {
+            return current
+        }
+
+        return "$current $next"
     }
 
     private fun render() {
@@ -581,9 +682,11 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             .orEmpty()
 
         if (text.isNotEmpty()) {
-            rememberOriginal(text)
-            render()
-            translateLine(text)
+            val delta = rememberOriginal(text)
+            if (delta != null) {
+                render()
+                translateLine(delta)
+            }
         }
         scheduleRestart()
     }
@@ -746,9 +849,11 @@ class SubtitleOverlayService : Service(), RecognitionListener {
                     val text = JSONObject(vosk.result).optString("text").trim()
                     if (text.isNotEmpty()) {
                         mainHandler.post {
-                            rememberOriginal(text)
-                            render()
-                            translateLine(text)
+                            val delta = rememberOriginal(text)
+                            if (delta != null) {
+                                render()
+                                translateLine(delta)
+                            }
                         }
                     }
                 } else {

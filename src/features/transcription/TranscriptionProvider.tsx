@@ -13,6 +13,7 @@ import { usePreferencesStore } from '@/store/usePreferencesStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { createEngine, type EngineEvent, type TranscriptionEngine } from '@/services/transcription';
 import { translateText } from '@/services/translation';
+import { mergeStreamingText, streamingDelta } from '@/lib/transcript';
 import type { EngineId, EngineStatus } from '@/types';
 import { uid } from '@/lib/utils';
 
@@ -83,6 +84,17 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
           preferences.autoTranslate &&
           preferences.targetLang !== 'none' &&
           !isSameLanguage(preferences.sourceLang, preferences.targetLang);
+
+        // Cumulative recognizers re-send the whole utterance on every result.
+        // Ignore results that add no new words so the same phrase is not
+        // stored — and translated — again and again.
+        const shown = session.segments.reduce(
+          (text, segment) => mergeStreamingText(text, segment.original),
+          '',
+        );
+        const newWords = streamingDelta(shown, event.text);
+        if (!newWords) break;
+
         const segmentId = uid('seg');
 
         session.addSegment({

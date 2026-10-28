@@ -37,6 +37,10 @@ export function TranscriptPanel() {
   // partial phrase is appended at the end while the speaker is still talking.
   const converted = useMemo(() => buildContinuousTranscript(segments), [segments]);
   const displayText = useMemo(() => appendInterim(converted, interim), [converted, interim]);
+  // Live partials from cumulative recognizers also repeat finalized words.
+  // appendInterim() de-duplicates them; render only the genuinely new tail.
+  const interimTail =
+    displayText.length > converted.length ? displayText.slice(converted.length).trimStart() : '';
   const hasContent = displayText.length > 0;
   const hasSomethingToClear = segments.length > 0 || interim.length > 0;
   const wordCount = converted ? converted.split(/\s+/).filter(Boolean).length : 0;
@@ -188,10 +192,10 @@ export function TranscriptPanel() {
               )}
             >
               {converted}
-              {interim ? (
+              {interimTail ? (
                 <span className="italic text-ink-300">
                   {converted ? ' ' : ''}
-                  {interim}
+                  {interimTail}
                 </span>
               ) : null}
               {isLive ? (
