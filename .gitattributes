@@ -1,0 +1,6 @@
+# Normalize line endings in Git; keep binaries untouched.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.jks binary
+*.keystore binary

@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: #070b14;
+  }
+
+  body {
+    @apply min-h-dvh bg-ink-950 font-sans text-ink-100 antialiased;
+    overscroll-behavior-y: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: rgba(34, 211, 238, 0.25);
+    color: #fff;
+  }
+
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.4);
+  }
+
+  input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+}
+
+@layer components {
+  .range-input {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, rgba(34, 211, 238, 0.9), rgba(139, 92, 246, 0.85));
+    outline: none;
+    cursor: pointer;
+  }
+
+  .range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #ffffff;
+    border: 3px solid #0b1120;
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.65);
+    transition: transform 120ms ease;
+  }
+
+  .range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+  }
+
+  .range-input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #ffffff;
+    border: 3px solid #0b1120;
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.65);
+  }
+
+  .range-input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
