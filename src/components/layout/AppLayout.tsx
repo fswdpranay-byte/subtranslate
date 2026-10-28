@@ -21,7 +21,9 @@ export function AppLayout() {
       </div>
 
       <div className="relative mx-auto min-h-dvh w-full max-w-6xl">
-        <Outlet />
+        <main className="min-h-dvh">
+          <Outlet />
+        </main>
       </div>
 
       {!hideNav ? (
@@ -47,7 +49,7 @@ export function AppLayout() {
                 {({ isActive }) => (
                   <>
                     <Icon className="h-4 w-4" strokeWidth={isActive ? 2.2 : 1.8} />
-                    <span className="text-[9px] font-semibold uppercase tracking-wider">{label}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
                   </>
                 )}
               </NavLink>
