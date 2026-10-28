@@ -63,7 +63,9 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace \
+            -PsubtranslateVersionCode=${{ github.run_number }} \
+            -PsubtranslateVersionName=1.0.${{ github.run_number }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -83,19 +85,26 @@ jobs:
           set -euo pipefail
           cp android/app/build/outputs/apk/debug/app-debug.apk subtranslate-debug.apk
 
-          cat > release-notes.md <<'EOF'
-          Automatic **debug** APK built from the latest `main` commit.
+          cat > version.json <<EOF
+          {"versionCode": ${{ github.run_number }}, "versionName": "1.0.${{ github.run_number }}", "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          EOF
 
+          cat > release-notes.md <<EOF
+          Automatic **debug** APK built from the latest \`main\` commit.
+
+          - Version name: \`1.0.${{ github.run_number }}\`
+          - Version code: \`${{ github.run_number }}\`
           - Installable on any Android phone (allow "Install unknown apps").
           - Signed with a fixed debug key, so each build installs over the previous one.
-          - Not accepted by Google Play. Use a signed `.aab` for the store.
+          - The app checks this release and offers a one-tap in-app update.
+          - Not accepted by Google Play. Use a signed \`.aab\` for the store.
           EOF
 
           if gh release view android-latest > /dev/null 2>&1; then
-            gh release upload android-latest subtranslate-debug.apk --clobber
+            gh release upload android-latest subtranslate-debug.apk version.json --clobber
             gh release edit android-latest --notes-file release-notes.md
           else
-            gh release create android-latest subtranslate-debug.apk \
+            gh release create android-latest subtranslate-debug.apk version.json \
               --prerelease --title "SubTranslate Android (debug)" \
               --notes-file release-notes.md
           fi

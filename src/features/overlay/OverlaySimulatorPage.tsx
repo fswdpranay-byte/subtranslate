@@ -32,6 +32,7 @@ import { usePreferencesStore } from '@/store/usePreferencesStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useNativeOverlay } from '@/hooks/useNativeOverlay';
 import { baseLanguage, languageLabel } from '@/config/languages';
+import { buildContinuousTranscript, appendInterim } from '@/lib/transcript';
 import { cn } from '@/lib/utils';
 import type { SubtitlePosition } from '@/types';
 
@@ -64,16 +65,26 @@ export function OverlaySimulatorPage() {
   const demo = useDemoCaptions();
   const nativeOverlay = useNativeOverlay();
 
-  const latest = segments[segments.length - 1];
-  const original = interim || latest?.original || 'This is how your live subtitles will look.';
-  const translated = interim
-    ? undefined
-    : (latest?.translated ??
-      SAMPLE_TRANSLATIONS[baseLanguage(preferences.targetLang)] ??
-      (preferences.targetLang === 'none'
-        ? undefined
-        : 'Translated captions appear here in real time.'));
-  const pending = Boolean(latest && latest.translationState === 'pending' && !interim);
+  // Captions accumulate instead of replacing each other, so the floating card
+  // reads like a continuous sentence group (same behaviour as the native card).
+  const recentOriginal = buildContinuousTranscript(segments, { limit: 3 });
+  const recentTranslated = buildContinuousTranscript(segments, {
+    limit: 3,
+    translatedOnly: true,
+  });
+  const original =
+    appendInterim(recentOriginal, interim) || 'This is how your live subtitles will look.';
+  const translated =
+    preferences.targetLang === 'none'
+      ? undefined
+      : recentTranslated ||
+        (segments.length === 0
+          ? (SAMPLE_TRANSLATIONS[baseLanguage(preferences.targetLang)] ??
+            'Translated captions appear here in real time.')
+          : undefined);
+  const pending = Boolean(
+    segments.some((segment) => segment.translationState === 'pending') && !interim,
+  );
 
   const modeLabel = useMemo(() => {
     if (isLive) return 'Live microphone';
@@ -121,7 +132,7 @@ export function OverlaySimulatorPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-ink-300">
             <span
               className={cn(

@@ -160,6 +160,11 @@ class SubtitleOverlayService : Service(), RecognitionListener {
     private var currentOriginal = ""
     private var currentTranslated = ""
 
+    /** Rolling caption lines so the overlay reads continuously instead of flashing. */
+    private val originalLines = ArrayDeque<String>()
+    private val translatedLines = ArrayDeque<String>()
+    private val maxCaptionLines = 3
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val translationExecutor = Executors.newSingleThreadExecutor()
     private val restartRunnable = Runnable { if (isRunning && captureMode == MODE_MIC) startListening() }
@@ -216,14 +221,34 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             background = roundedBackground(backgroundOpacity)
         }
 
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, 0, 0, dp(2))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val clear = TextView(this).apply {
+            text = "Clear"
+            setTextColor(Color.parseColor("#94A3B8"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            setOnClickListener { clearTranscript() }
+        }
+
         val close = TextView(this).apply {
             text = "✕"
             setTextColor(Color.parseColor("#94A3B8"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            gravity = Gravity.END
-            setPadding(0, 0, 0, dp(2))
+            setPadding(dp(8), dp(6), dp(4), dp(6))
             setOnClickListener { stopSelf() }
         }
+
+        header.addView(clear)
+        header.addView(close)
 
         originalView = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -242,7 +267,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             setShadowLayer(6f, 0f, 2f, Color.BLACK)
         }
 
-        container.addView(close)
+        container.addView(header)
         container.addView(originalView)
         container.addView(translatedView)
 
@@ -365,6 +390,44 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             setColor(Color.argb(alpha, 2, 6, 23))
             setStroke(dp(1), Color.argb(60, 255, 255, 255))
         }
+    }
+
+    /** Append a finalized phrase and keep the last few lines visible together. */
+    private fun rememberOriginal(text: String) {
+        val line = text.trim()
+        if (line.isEmpty()) return
+        if (originalLines.lastOrNull() == line) return
+        originalLines.addLast(line)
+        while (originalLines.size > maxCaptionLines) originalLines.removeFirst()
+        currentOriginal = originalLines.joinToString(" ")
+        // Keep earlier translations visible while the newest phrase is translated.
+        currentTranslated = translatedLines.joinToString(" ")
+    }
+
+    /** Append a completed translation so converted captions also continue. */
+    private fun rememberTranslated(text: String) {
+        val line = text.trim()
+        if (line.isEmpty()) return
+        if (translatedLines.lastOrNull() == line) return
+        translatedLines.addLast(line)
+        while (translatedLines.size > maxCaptionLines) translatedLines.removeFirst()
+        currentTranslated = translatedLines.joinToString(" ")
+    }
+
+    /** Show the live partial phrase after the finalized lines. */
+    private fun showPartial(partial: String) {
+        val line = partial.trim()
+        currentOriginal =
+            if (line.isEmpty()) originalLines.joinToString(" ")
+            else (originalLines + line).joinToString(" ")
+    }
+
+    private fun clearTranscript() {
+        originalLines.clear()
+        translatedLines.clear()
+        currentOriginal = ""
+        currentTranslated = ""
+        render()
     }
 
     private fun render() {
@@ -505,7 +568,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             ?.trim()
             .orEmpty()
         if (text.isNotEmpty()) {
-            currentOriginal = text
+            showPartial(text)
             render()
         }
     }
@@ -518,8 +581,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
             .orEmpty()
 
         if (text.isNotEmpty()) {
-            currentOriginal = text
-            currentTranslated = ""
+            rememberOriginal(text)
             render()
             translateLine(text)
         }
@@ -684,8 +746,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
                     val text = JSONObject(vosk.result).optString("text").trim()
                     if (text.isNotEmpty()) {
                         mainHandler.post {
-                            currentOriginal = text
-                            currentTranslated = ""
+                            rememberOriginal(text)
                             render()
                             translateLine(text)
                         }
@@ -694,7 +755,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
                     val partial = JSONObject(vosk.partialResult).optString("partial").trim()
                     if (partial.isNotEmpty()) {
                         mainHandler.post {
-                            currentOriginal = partial
+                            showPartial(partial)
                             render()
                         }
                     }
@@ -897,7 +958,7 @@ class SubtitleOverlayService : Service(), RecognitionListener {
 
                     if (translated.isNotEmpty() && !translated.startsWith("MYMEMORY WARNING")) {
                         mainHandler.post {
-                            currentTranslated = translated
+                            rememberTranslated(translated)
                             render()
                         }
                     }

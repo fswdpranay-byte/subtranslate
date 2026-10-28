@@ -11,7 +11,7 @@ interface SwitchProps {
 
 export function Switch({ checked, onChange, label, description, disabled, id }: SwitchProps) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex items-start justify-between gap-3 sm:gap-4">
       <label htmlFor={id} className={cn('min-w-0 flex-1', disabled ? 'opacity-60' : 'cursor-pointer')}>
         <span className="block text-sm font-medium text-ink-100">{label}</span>
         {description ? (

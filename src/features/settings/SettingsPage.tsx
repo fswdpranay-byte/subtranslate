@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  CheckCircle2,
   ChevronRight,
   Cloud,
   Cpu,
@@ -8,6 +9,7 @@ import {
   Download,
   Languages,
   LogIn,
+  RefreshCw,
   RotateCcw,
   Shield,
   Trash2,
@@ -23,8 +25,16 @@ import { useUiStore, toast } from '@/store/useUiStore';
 import { appConfig, isSupabaseConfigured } from '@/config/appConfig';
 import { languageLabel } from '@/config/languages';
 import { clearTranslationCache } from '@/services/translation';
+import { cn } from '@/lib/utils';
 import { promptInstall } from '@/lib/install';
 import { isStandalone } from '@/lib/pwa';
+import {
+  checkForUpdates,
+  getInstalledAppInfo,
+  installUpdate,
+  RELEASE_PAGE_URL,
+  type InstalledAppInfo,
+} from '@/lib/updater';
 import { supabase } from '@/lib/supabase';
 
 export function SettingsPage() {
@@ -33,11 +43,25 @@ export function SettingsPage() {
   const resetPreferences = usePreferencesStore((state) => state.resetPreferences);
   const resetOnboarding = usePreferencesStore((state) => state.resetOnboarding);
   const canInstall = useUiStore((state) => state.canInstall);
+  const updateStatus = useUiStore((state) => state.updateStatus);
+  const updateDetail = useUiStore((state) => state.updateDetail);
+  const updateVersion = useUiStore((state) => state.updateVersion);
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
   const [busyBackup, setBusyBackup] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [appInfo, setAppInfo] = useState<InstalledAppInfo | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getInstalledAppInfo().then((info) => {
+      if (active) setAppInfo(info);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const backupPreferences = async () => {
     if (!supabase || !user) return;
@@ -290,6 +314,119 @@ export function SettingsPage() {
           <p className="mt-3 text-[10px] leading-relaxed text-ink-400">
             Android release bundles are documented in <code className="text-ink-300">ANDROID_GUIDE.md</code>.
             App ID: <code className="text-ink-300">{appConfig.overlay.androidAppId}</code>.
+          </p>
+        </Card>
+
+        <Card className="p-4">
+          <CardHeader
+            icon={<RefreshCw className="h-4 w-4" />}
+            title="App updates"
+            description={
+              appInfo?.native
+                ? 'Download the newest APK directly inside the app.'
+                : 'Check for a new web build and activate it in one tap.'
+            }
+            action={
+              <Badge
+                tone={
+                  updateStatus === 'available' || updateStatus === 'installing'
+                    ? 'brand'
+                    : updateStatus === 'current'
+                      ? 'success'
+                      : updateStatus === 'error'
+                        ? 'warning'
+                        : 'neutral'
+                }
+                className="normal-case"
+              >
+                {updateStatus === 'checking'
+                  ? 'Checking'
+                  : updateStatus === 'available'
+                    ? 'Update ready'
+                    : updateStatus === 'installing'
+                      ? 'Downloading'
+                      : updateStatus === 'current'
+                        ? 'Up to date'
+                        : updateStatus === 'error'
+                          ? 'Check failed'
+                          : 'Idle'}
+              </Badge>
+            }
+          />
+
+          <div className="mt-3 divide-y divide-white/[0.06] rounded-xl border border-white/[0.06] bg-ink-950/40">
+            <InfoRow
+              label="Installed"
+              value={
+                appInfo
+                  ? appInfo.native
+                    ? `${appInfo.version} (build ${appInfo.build})`
+                    : `${appInfo.version} · web build`
+                  : 'Reading version…'
+              }
+            />
+            <InfoRow
+              label="Channel"
+              value={appInfo?.native ? 'Android APK · GitHub release' : 'Web / installed PWA'}
+            />
+            {updateVersion ? <InfoRow label="Available" value={updateVersion} /> : null}
+          </div>
+
+          <p
+            className={cn(
+              'mt-3 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed',
+              updateStatus === 'available' || updateStatus === 'installing'
+                ? 'border-brand-400/20 bg-brand-400/[0.06] text-brand-100'
+                : updateStatus === 'error'
+                  ? 'border-amber-400/15 bg-amber-400/[0.05] text-amber-200/80'
+                  : 'border-white/[0.06] bg-white/[0.02] text-ink-400',
+            )}
+          >
+            {updateDetail ??
+              'The app checks quietly for new builds. Tap below whenever you want to look now.'}
+          </p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={updateStatus === 'checking'}
+              onClick={() => void checkForUpdates()}
+              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+            >
+              Check for updates
+            </Button>
+            {updateStatus === 'available' ? (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => void installUpdate()}
+                leftIcon={
+                  appInfo?.native ? (
+                    <Download className="h-3.5 w-3.5" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )
+                }
+              >
+                {appInfo?.native ? 'Download & install' : 'Update now'}
+              </Button>
+            ) : (
+              <a
+                href={RELEASE_PAGE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-transparent px-3 text-xs text-ink-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/5"
+              >
+                Release notes
+              </a>
+            )}
+          </div>
+
+          <p className="mt-3 text-[10px] leading-relaxed text-ink-400">
+            Android shows one system confirmation before installing; the APK is signed with the same
+            test key, so it updates in place without uninstalling. Web and PWA builds activate after a
+            quick reload.
           </p>
         </Card>
 

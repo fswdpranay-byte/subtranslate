@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
-import { applyUpdate, isStandalone } from '@/lib/pwa';
+import { isStandalone } from '@/lib/pwa';
+import { installUpdate } from '@/lib/updater';
 import { promptInstall } from '@/lib/install';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useUiStore } from '@/store/useUiStore';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 export function PwaBanners() {
   const online = useOnlineStatus();
   const updateAvailable = useUiStore((state) => state.updateAvailable);
+  const updateVersion = useUiStore((state) => state.updateVersion);
   const offlineReady = useUiStore((state) => state.offlineReady);
   const canInstall = useUiStore((state) => state.canInstall);
   const installDismissed = useUiStore((state) => state.installDismissed);
@@ -59,11 +61,22 @@ export function PwaBanners() {
   if (updateAvailable) {
     return (
       <div className="fixed inset-x-0 top-0 z-[75] flex justify-center p-3">
-        <div className="flex items-center gap-3 rounded-2xl border border-brand-400/20 bg-ink-900/95 px-3 py-2 text-[11px] text-ink-200 shadow-xl backdrop-blur">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-2xl border border-brand-400/20 bg-ink-900/95 px-3 py-2 text-[11px] text-ink-200 shadow-xl backdrop-blur">
           <RefreshCw className="h-3.5 w-3.5 text-brand-300" />
-          <span>A new SubTranslate build is ready.</span>
-          <Button size="sm" onClick={() => void applyUpdate()} className="h-7 px-2 text-[10px]">
-            Reload
+          <span>
+            {updateVersion
+              ? `SubTranslate ${updateVersion} is ready to install.`
+              : 'A new SubTranslate build is ready.'}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setUpdateAvailable(false);
+              void installUpdate();
+            }}
+            className="h-7 px-2 text-[10px]"
+          >
+            Update now
           </Button>
           <button
             type="button"

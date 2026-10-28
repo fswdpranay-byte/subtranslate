@@ -8,9 +8,14 @@ interface Toast {
   tone: 'info' | 'success' | 'error';
 }
 
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'installing' | 'current' | 'error';
+
 interface UiStore {
   toasts: Toast[];
   updateAvailable: boolean;
+  updateStatus: UpdateStatus;
+  updateDetail: string | null;
+  updateVersion: string | null;
   offlineReady: boolean;
   canInstall: boolean;
   installDismissed: boolean;
@@ -19,6 +24,7 @@ interface UiStore {
   pushToast: (toast: Omit<Toast, 'id'>) => void;
   dismissToast: (id: string) => void;
   setUpdateAvailable: (value: boolean) => void;
+  setUpdateState: (status: UpdateStatus, detail?: string | null, version?: string | null) => void;
   setOfflineReady: (value: boolean) => void;
   setCanInstall: (value: boolean) => void;
   dismissInstall: () => void;
@@ -30,6 +36,9 @@ let toastSequence = 0;
 export const useUiStore = create<UiStore>()((set) => ({
   toasts: [],
   updateAvailable: false,
+  updateStatus: 'idle',
+  updateDetail: null,
+  updateVersion: null,
   offlineReady: false,
   canInstall: false,
   installDismissed:
@@ -47,6 +56,13 @@ export const useUiStore = create<UiStore>()((set) => ({
     set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) })),
 
   setUpdateAvailable: (value) => set({ updateAvailable: value }),
+  setUpdateState: (status, detail = null, version = null) =>
+    set({
+      updateStatus: status,
+      updateDetail: detail,
+      updateVersion: version,
+      ...(status === 'available' ? { updateAvailable: true } : {}),
+    }),
   setOfflineReady: (value) => set({ offlineReady: value }),
   setCanInstall: (value) => set({ canInstall: value }),
   dismissInstall: () => {

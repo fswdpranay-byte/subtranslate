@@ -12,6 +12,7 @@ import com.getcapacitor.BridgeActivity
 class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         registerPlugin(SubtitleOverlayPlugin::class.java)
+        registerPlugin(AppUpdaterPlugin::class.java)
         super.onCreate(savedInstanceState)
     }
 }

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Layers, UserRound, Wifi, WifiOff } from 'lucide-react';
+import { Layers, RefreshCw, UserRound, Wifi, WifiOff } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { LiveControlCard } from './LiveControlCard';
 import { LanguageControls } from './LanguageControls';
@@ -9,16 +9,28 @@ import { OverlayLauncher } from './OverlayLauncher';
 import { TranscriptPanel } from './TranscriptPanel';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useUiStore } from '@/store/useUiStore';
+import { checkForUpdates, installUpdate } from '@/lib/updater';
 import { cn } from '@/lib/utils';
 
 export function DashboardPage() {
   const online = useOnlineStatus();
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const updateAvailable = useUiStore((state) => state.updateAvailable);
+  const updateStatus = useUiStore((state) => state.updateStatus);
   const initial =
     profile?.display_name?.trim().charAt(0).toUpperCase() ||
     user?.email?.charAt(0).toUpperCase() ||
     'G';
+
+  const handleUpdate = () => {
+    if (updateAvailable) {
+      void installUpdate();
+      return;
+    }
+    void checkForUpdates();
+  };
 
   return (
     <div className="px-4 pb-32 pt-4 sm:px-6">
@@ -36,6 +48,25 @@ export function DashboardPage() {
             {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {online ? 'Online' : 'Offline'}
           </span>
+          <button
+            type="button"
+            onClick={handleUpdate}
+            aria-label={updateAvailable ? 'Update SubTranslate now' : 'Check for app updates'}
+            title={updateAvailable ? 'Update available — tap to install' : 'Check for updates'}
+            className={cn(
+              'relative flex h-9 w-9 items-center justify-center rounded-xl ring-1 ring-inset transition',
+              updateAvailable
+                ? 'bg-brand-400/15 text-brand-200 ring-brand-400/30 hover:bg-brand-400/25'
+                : 'bg-white/[0.04] text-ink-300 ring-white/10 hover:bg-white/10 hover:text-white',
+            )}
+          >
+            <RefreshCw
+              className={cn('h-4 w-4', updateStatus === 'checking' && 'animate-spin')}
+            />
+            {updateAvailable ? (
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-300" />
+            ) : null}
+          </button>
           <Link
             to="/overlay"
             aria-label="Open overlay simulator"

@@ -124,6 +124,8 @@ Translation is applied to **final** segments only. Results are cached in `localS
 
 The GitHub Actions workflow rebuilds this **debug APK** on every push to `main`. On the phone: open the link, allow "Install unknown apps", install, then grant microphone, notifications, and **Display over other apps**. Successive builds are signed with the same committed debug key, so they install over the previous version without uninstalling.
 
+After the first manual install, the app updates itself: the Settings → **App updates** card (and the refresh button on the dashboard) compares the installed build with the latest GitHub release, downloads the APK, and hands it to Android's installer. Web/PWA builds update through the service worker from the same banner.
+
 ### Two capture modes
 
 | Mode | What it hears | Requirements |

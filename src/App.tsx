@@ -13,6 +13,7 @@ import { AuthPage } from '@/features/auth/AuthPage';
 import { TranscriptionProvider } from '@/features/transcription/TranscriptionProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePreferencesStore } from '@/store/usePreferencesStore';
+import { useAutoUpdateCheck } from '@/lib/updater';
 import type { ReactNode } from 'react';
 
 function RequireOnboarding({ children }: { children: ReactNode }) {
@@ -52,6 +53,7 @@ function useNativeBackButton() {
 export default function App() {
   const initializeAuth = useAuthStore((state) => state.initialize);
   useNativeBackButton();
+  useAutoUpdateCheck();
 
   useEffect(() => {
     void initializeAuth();

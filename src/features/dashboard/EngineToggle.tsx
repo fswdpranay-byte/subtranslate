@@ -82,7 +82,7 @@ function EngineRow({
       disabled={disabled}
       aria-pressed={selected}
       className={cn(
-        'flex w-full items-start gap-3 rounded-xl border p-3 text-left transition',
+        'flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition sm:gap-3 sm:p-3',
         selected
           ? 'border-brand-400/40 bg-brand-400/[0.07] shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08)]'
           : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]',
